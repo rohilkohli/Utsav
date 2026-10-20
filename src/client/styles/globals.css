@@ -1,0 +1,117 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* Indian Festive Palette */
+  --primary-saffron: #e65100;
+  --primary-saffron-light: #ff9800;
+  --primary-gold: #ffb300;
+  --primary-magenta: #c2185b;
+  --primary-magenta-dark: #880e4f;
+  --primary-emerald: #00695c;
+  --primary-emerald-light: #00897b;
+
+  --bg-gradient: linear-gradient(135deg, #fff8f0 0%, #fdf2f7 50%, #f0fdf9 100%);
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-card-hover: #ffffff;
+  --surface-border: rgba(230, 81, 0, 0.15);
+  --surface-shadow: 0 10px 25px -5px rgba(194, 24, 91, 0.08), 0 8px 10px -6px rgba(0, 105, 92, 0.05);
+
+  --text-main: #1f2937;
+  --text-muted: #4b5563;
+  --text-light: #6b7280;
+
+  --danger-bg: #fee2e2;
+  --danger-border: #f87171;
+  --danger-text: #b91c1c;
+
+  --success-bg: #ecfdf5;
+  --success-border: #34d399;
+  --success-text: #047857;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-gradient: linear-gradient(135deg, #18111c 0%, #151a1e 50%, #101614 100%);
+    --surface-card: rgba(28, 25, 34, 0.88);
+    --surface-card-hover: rgba(38, 34, 46, 0.95);
+    --surface-border: rgba(255, 179, 0, 0.2);
+    --surface-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+
+    --text-main: #f9fafb;
+    --text-muted: #d1d5db;
+    --text-light: #9ca3af;
+
+    --danger-bg: #450a0a;
+    --danger-border: #991b1b;
+    --danger-text: #fca5a5;
+
+    --success-bg: #064e3b;
+    --success-border: #059669;
+    --success-text: #6ee7b7;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-gradient);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Accessible visible focus outlines */
+:focus-visible {
+  outline: 3px solid var(--primary-saffron);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utilities */
+.container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
