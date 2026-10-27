@@ -8,11 +8,7 @@ interface ReviewStepProps {
   onGenerate: () => void;
 }
 
-export const ReviewStep: React.FC<ReviewStepProps> = ({
-  input,
-  isGenerating,
-  onGenerate,
-}) => {
+export const ReviewStep: React.FC<ReviewStepProps> = ({ input, isGenerating, onGenerate }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div>
@@ -83,7 +79,14 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 
         {input.subEvents && input.subEvents.length > 0 && (
           <div style={{ gridColumn: '1 / -1' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'block', marginBottom: '0.25rem' }}>
+            <span
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-light)',
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               Selected Functions / Ceremonies
             </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
@@ -111,9 +114,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'block' }}>
               Theme / Vibe
             </span>
-            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>
-              ✨ {input.theme}
-            </span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>✨ {input.theme}</span>
           </div>
         )}
 
@@ -160,7 +161,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
             fontWeight: 700,
             borderRadius: 'var(--radius-full)',
             border: 'none',
-            background: 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
+            background:
+              'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
             color: '#ffffff',
             cursor: isGenerating ? 'not-allowed' : 'pointer',
             boxShadow: '0 10px 20px -5px rgba(230, 81, 0, 0.4)',

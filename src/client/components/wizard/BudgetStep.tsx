@@ -97,7 +97,9 @@ export const BudgetStep: React.FC<BudgetStepProps> = ({
                   background: isSelected ? 'var(--surface-card-hover)' : 'var(--surface-card)',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  boxShadow: isSelected ? '0 0 0 1px var(--primary-saffron)' : 'var(--surface-shadow)',
+                  boxShadow: isSelected
+                    ? '0 0 0 1px var(--primary-saffron)'
+                    : 'var(--surface-shadow)',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -110,7 +112,9 @@ export const BudgetStep: React.FC<BudgetStepProps> = ({
                 >
                   {formatINR(preset.value)}
                 </span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                <span
+                  style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}
+                >
                   {preset.label.replace(/^₹[\d,]+\s*/, '')}
                 </span>
               </button>

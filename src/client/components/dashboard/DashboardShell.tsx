@@ -5,6 +5,7 @@ import { TimelineTab } from './TimelineTab';
 import { VendorsTab } from './VendorsTab';
 import { IdeasTab } from './IdeasTab';
 import { ShareModal } from '../shared/ShareModal';
+import { useAuth } from '../../hooks/useAuth.js';
 
 interface DashboardShellProps {
   input: WizardInput;
@@ -25,22 +26,19 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('budget');
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const { user, login } = useAuth();
 
   const handleUpdateCategories = (categories: BudgetCategory[], newTotalBudget?: number) => {
     onUpdatePlan({ ...plan, budget: categories }, newTotalBudget);
   };
 
   const handleToggleMilestone = (id: string) => {
-    const updated = plan.timeline.map((m) =>
-      m.id === id ? { ...m, completed: !m.completed } : m,
-    );
+    const updated = plan.timeline.map((m) => (m.id === id ? { ...m, completed: !m.completed } : m));
     onUpdatePlan({ ...plan, timeline: updated });
   };
 
   const handleUpdateVendor = (id: string, updates: Partial<Vendor>) => {
-    const updated = plan.vendors.map((v) =>
-      v.id === id ? { ...v, ...updates } : v,
-    );
+    const updated = plan.vendors.map((v) => (v.id === id ? { ...v, ...updates } : v));
     onUpdatePlan({ ...plan, vendors: updated });
   };
 
@@ -57,6 +55,51 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 
   return (
     <div className="container" style={{ padding: '2rem 1.25rem' }}>
+      {/* Guest Mode Persistence Prompt */}
+      {!user && (
+        <div
+          role="region"
+          aria-label="Guest session notification"
+          data-testid="guest-save-prompt"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255, 111, 0, 0.08) 0%, rgba(194, 24, 91, 0.08) 100%)',
+            border: '1px solid var(--primary-saffron)',
+            color: 'var(--text-main)',
+            padding: '0.85rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.25rem' }}>💾</span>
+            <span style={{ fontSize: '0.92rem', fontWeight: 600 }}>
+              Guest mode: Your celebration plan is saved on this browser. Sign in to save across devices.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={login}
+            style={{
+              padding: '0.45rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
+              color: '#ffffff',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(230, 81, 0, 0.25)',
+            }}
+          >
+            Sign in to save across devices
+          </button>
+        </div>
+      )}
       {/* Fallback notification if Gemini hit quota / network issues */}
       {isFallback && (
         <div
@@ -75,7 +118,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           }}
         >
           <span>
-            ℹ️ Showing curated expert defaults for {input.city} {input.eventType}. You can customize everything below!
+            ℹ️ Showing curated expert defaults for {input.city} {input.eventType}. You can customize
+            everything below!
           </span>
         </div>
       )}
@@ -97,29 +141,35 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
         }}
       >
         <div style={{ maxWidth: '680px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-            <span
-              style={{
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--primary-saffron)',
-              }}
-            >
-              {input.eventType} in {input.city}
-            </span>
-            <span style={{ color: 'var(--text-light)' }}>•</span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {input.guestCount} guests
-            </span>
+          {/* Event KPI chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
+            {[
+              { icon: '🎉', label: input.eventType.charAt(0).toUpperCase() + input.eventType.slice(1), color: 'var(--primary-saffron)' },
+              { icon: '🗺️', label: input.city, color: 'var(--primary-magenta)' },
+              { icon: '👥', label: `${input.guestCount.toLocaleString('en-IN')} guests`, color: 'var(--primary-emerald)' },
+              { icon: '📅', label: input.eventDate, color: 'var(--primary-saffron)' },
+              ...(input.subEvents.length > 0 ? [{ icon: '🎊', label: `${input.subEvents.length} ceremonies`, color: 'var(--primary-magenta)' }] : []),
+              ...(input.language === 'hindi' ? [{ icon: '🇮🇳', label: 'Hindi Output', color: 'var(--primary-emerald)' }] : []),
+            ].map((chip) => (
+              <span key={chip.label} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                fontSize: '0.78rem', fontWeight: 600,
+                background: 'rgba(0,0,0,0.04)',
+                border: '1px solid var(--surface-border)',
+                padding: '0.2rem 0.6rem',
+                borderRadius: 'var(--radius-full)',
+                color: chip.color,
+              }}>
+                {chip.icon} {chip.label}
+              </span>
+            ))}
           </div>
 
           <p
             style={{
-              fontSize: '1.15rem',
+              fontSize: '1.1rem',
               fontWeight: 600,
-              lineHeight: 1.45,
+              lineHeight: 1.5,
               color: 'var(--text-main)',
               margin: 0,
             }}
@@ -141,7 +191,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
               fontWeight: 700,
               borderRadius: 'var(--radius-md)',
               border: 'none',
-              background: 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
+              background:
+                'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
               color: '#ffffff',
               cursor: 'pointer',
               boxShadow: '0 4px 10px rgba(230, 81, 0, 0.3)',
@@ -233,6 +284,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
         {activeTab === 'vendors' && (
           <VendorsTab
             vendors={plan.vendors}
+            city={input.city}
             onUpdateVendor={handleUpdateVendor}
           />
         )}

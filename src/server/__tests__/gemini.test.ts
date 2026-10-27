@@ -101,11 +101,15 @@ describe('Gemini Service & Prompts Branches', () => {
 
     const fallbackCommunity = generateFallbackPlan(communityInput);
     expect(fallbackCommunity.budget.length).toBeGreaterThan(0);
-    expect(fallbackCommunity.budget.reduce((a, b) => a + b.amount, 0)).toBe(communityInput.totalBudget);
+    expect(fallbackCommunity.budget.reduce((a, b) => a + b.amount, 0)).toBe(
+      communityInput.totalBudget,
+    );
 
     const fallbackBirthday = generateFallbackPlan(birthdayMinimal);
     expect(fallbackBirthday.budget.length).toBeGreaterThan(0);
-    expect(fallbackBirthday.budget.reduce((a, b) => a + b.amount, 0)).toBe(birthdayMinimal.totalBudget);
+    expect(fallbackBirthday.budget.reduce((a, b) => a + b.amount, 0)).toBe(
+      birthdayMinimal.totalBudget,
+    );
   });
 
   it('enriches raw Gemini plan with unique IDs, subEvents, and vendor budget matching', () => {
@@ -117,17 +121,31 @@ describe('Gemini Service & Prompts Branches', () => {
         { category: 'Games & Cake', suggestedPercent: 20 },
       ],
       timeline: [
-        { title: 'Order Cake', description: 'Chocolate truffle', daysBeforeEvent: 7, subEvent: 'Party' },
+        {
+          title: 'Order Cake',
+          description: 'Chocolate truffle',
+          daysBeforeEvent: 7,
+          subEvent: 'Party',
+        },
       ],
       vendors: [
-        { category: 'Catering', questionsToAsk: ['Vegetarian menu?'], bookByDaysBeforeEvent: 14, subEvent: 'Dinner' },
+        {
+          category: 'Catering',
+          questionsToAsk: ['Vegetarian menu?'],
+          bookByDaysBeforeEvent: 14,
+          subEvent: 'Dinner',
+        },
       ],
       ideas: [
         { section: 'theme', title: 'Bollywood Gala', description: 'Retro 80s' },
         { section: 'decor', title: 'Film reels', description: 'Red carpet backdrop' },
         { section: 'food', title: 'Chaat station', description: 'Pani puri live' },
         { section: 'activities', title: 'Dialogue quiz', description: 'Famous catchphrases' },
-        { section: 'returnGifts', title: 'Personalized cassettes', description: 'Custom sweets box' },
+        {
+          section: 'returnGifts',
+          title: 'Personalized cassettes',
+          description: 'Custom sweets box',
+        },
       ],
     };
 

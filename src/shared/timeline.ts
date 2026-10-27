@@ -44,7 +44,7 @@ export function getCountdownToEvent(eventDate: string): {
   const days = diffInDays(today, eventDate);
 
   if (days === 0) {
-    return { days: 0, isPast: false, isToday: true, label: "Today is the big day! 🎉" };
+    return { days: 0, isPast: false, isToday: true, label: 'Today is the big day! 🎉' };
   } else if (days < 0) {
     return {
       days: Math.abs(days),

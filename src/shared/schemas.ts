@@ -1,10 +1,16 @@
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 export const EVENT_TYPES = ['wedding', 'birthday', 'community'] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
 export const IDEA_SECTIONS = ['theme', 'decor', 'food', 'activities', 'returnGifts'] as const;
+export type IdeaSection = (typeof IDEA_SECTIONS)[number];
+
 export const OUTPUT_LANGUAGES = ['english', 'hindi'] as const;
+export type OutputLanguage = (typeof OUTPUT_LANGUAGES)[number];
+
 export const VENDOR_STATUSES = ['to-contact', 'quoted', 'booked'] as const;
+export type VendorStatus = (typeof VENDOR_STATUSES)[number];
 
 export const WEDDING_SUB_EVENTS = [
   'Roka',
@@ -76,7 +82,6 @@ export const wizardInputSchema = z
 export type WizardInput = z.infer<typeof wizardInputSchema>;
 
 // ─── Gemini Structured Plan Output Schema ─────────────────────
-// Raw AI output returns categories with suggested percentages, milestone relative days, vendor leads, and ideas.
 export const rawBudgetCategorySchema = z.object({
   category: z.string().min(1),
   suggestedPercent: z.number().min(0).max(100),
@@ -169,6 +174,12 @@ export const planOutputSchema = z.object({
 });
 export type PlanOutput = z.infer<typeof planOutputSchema>;
 
+// ─── Plan Meta Source ─────────────────────────────────────────
+export const planMetaSchema = z.object({
+  source: z.enum(['gemini', 'cache', 'fallback']),
+});
+export type PlanMeta = z.infer<typeof planMetaSchema>;
+
 // ─── Refinement Schema ────────────────────────────────────────
 export const refineInputSchema = z.object({
   planId: z.string().optional(),
@@ -191,15 +202,24 @@ export type GeminiRefineOutput = z.infer<typeof geminiRefineOutputSchema>;
 // ─── Saved Plan & Share Schema ────────────────────────────────
 export const savedPlanSchema = z.object({
   id: z.string(),
+  ownerUid: z.string().optional(),
   userId: z.string().optional(),
   shareToken: z.string().optional(),
   input: wizardInputSchema,
   plan: planOutputSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
-  expiresAt: z.string().optional(), // For read-only guest shares (30 days)
+  expiresAt: z.string().optional(), // ISO string at the API boundary; Firestore Timestamp is handled internally in firestore.ts
 });
 export type SavedPlan = z.infer<typeof savedPlanSchema>;
+
+export const updatePlanRequestSchema = z
+  .object({
+    input: wizardInputSchema.optional(),
+    plan: planOutputSchema,
+  })
+  .strict();
+export type UpdatePlanRequest = z.infer<typeof updatePlanRequestSchema>;
 
 // ─── API Payloads ─────────────────────────────────────────────
 export const generatePlanRequestSchema = z.object({
@@ -210,12 +230,13 @@ export type GeneratePlanRequest = z.infer<typeof generatePlanRequestSchema>;
 export const generatePlanResponseSchema = z.object({
   plan: planOutputSchema,
   planId: z.string().optional(),
-  isFallback: z.boolean().optional(),
+  meta: planMetaSchema,
 });
 export type GeneratePlanResponse = z.infer<typeof generatePlanResponseSchema>;
 
 export const refineSectionResponseSchema = z.object({
   ideas: z.array(ideaSchema),
+  meta: planMetaSchema,
 });
 export type RefineSectionResponse = z.infer<typeof refineSectionResponseSchema>;
 
@@ -232,22 +253,13 @@ export const publicConfigSchema = z.object({
 });
 export type PublicConfig = z.infer<typeof publicConfigSchema>;
 
-/** Generate JSON Schema for Gemini structured output via zod-to-json-schema */
+/**
+ * Generate native JSON Schema for Gemini structured output via Zod 4's native z.toJSONSchema
+ */
 export function getGeminiPlanJsonSchema(): Record<string, unknown> {
-  const fullSchema = zodToJsonSchema(geminiRawPlanSchema, 'GeminiRawPlan');
-  // Return the main definition without $schema or root-level envelope
-  const definitions = (fullSchema as { definitions?: Record<string, unknown> }).definitions;
-  if (definitions?.GeminiRawPlan) {
-    return definitions.GeminiRawPlan as Record<string, unknown>;
-  }
-  return fullSchema as Record<string, unknown>;
+  return z.toJSONSchema(geminiRawPlanSchema) as Record<string, unknown>;
 }
 
 export function getGeminiRefineJsonSchema(): Record<string, unknown> {
-  const fullSchema = zodToJsonSchema(geminiRefineOutputSchema, 'GeminiRefineOutput');
-  const definitions = (fullSchema as { definitions?: Record<string, unknown> }).definitions;
-  if (definitions?.GeminiRefineOutput) {
-    return definitions.GeminiRefineOutput as Record<string, unknown>;
-  }
-  return fullSchema as Record<string, unknown>;
+  return z.toJSONSchema(geminiRefineOutputSchema) as Record<string, unknown>;
 }

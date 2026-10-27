@@ -1,10 +1,6 @@
 import React from 'react';
 import type { BudgetCategory } from '@shared/schemas';
-import {
-  calculateBudgetTotals,
-  applyBudgetCut,
-  groupCategoriesBySubEvent,
-} from '@shared/budget';
+import { calculateBudgetTotals, applyBudgetCut, groupCategoriesBySubEvent } from '@shared/budget';
 import { formatINR, parseINR } from '@shared/currency';
 
 interface BudgetTabProps {
@@ -22,9 +18,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
   const grouped = groupCategoriesBySubEvent(categories);
 
   const handleActualChange = (id: string, newActual: number) => {
-    const updated = categories.map((c) =>
-      c.id === id ? { ...c, actual: newActual } : c
-    );
+    const updated = categories.map((c) => (c.id === id ? { ...c, actual: newActual } : c));
     onUpdateCategories(updated);
   };
 
@@ -56,7 +50,8 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
             <div>
               <span>Over Budget Warning!</span>
               <p style={{ fontSize: '0.85rem', fontWeight: 400, marginTop: '0.1rem' }}>
-                Your actual planned spend exceeds your target budget by {formatINR(totals.overBudgetAmount)}.
+                Your actual planned spend exceeds your target budget by{' '}
+                {formatINR(totals.overBudgetAmount)}.
               </p>
             </div>
           </div>
@@ -146,8 +141,70 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
               color: totals.isOverBudget ? 'var(--danger-text)' : 'var(--success-text)',
             }}
           >
-            {totals.difference > 0 ? `+${formatINR(totals.difference)}` : formatINR(totals.difference)}
+            {totals.difference > 0
+              ? `+${formatINR(totals.difference)}`
+              : formatINR(totals.difference)}
           </span>
+        </div>
+      </div>
+
+      {/* Visual Budget Distribution Bar */}
+      <div style={{
+        background: 'var(--surface-card)',
+        padding: '1.25rem',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--surface-border)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
+          <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>📊 Budget Distribution</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            {categories.length} categories · Gemini-suggested percentages
+          </span>
+        </div>
+        {/* Stacked bar */}
+        <div style={{
+          height: '22px',
+          borderRadius: 'var(--radius-full)',
+          overflow: 'hidden',
+          display: 'flex',
+          marginBottom: '0.75rem',
+          border: '1px solid var(--surface-border)',
+        }}>
+          {categories.map((cat, idx) => {
+            const pct = totalBudget > 0 ? (cat.amount / totalBudget) * 100 : 0;
+            // Cycle through a palette
+            const colors = [
+              'var(--primary-saffron)', 'var(--primary-magenta)', 'var(--primary-emerald)',
+              'var(--primary-gold)', '#7c3aed', '#0891b2', '#dc2626', '#16a34a',
+            ];
+            return (
+              <div
+                key={cat.id}
+                title={`${cat.category}: ${cat.suggestedPercent}% · ${formatINR(cat.amount)}`}
+                style={{
+                  width: `${pct}%`,
+                  background: colors[idx % colors.length],
+                  transition: 'width 0.4s ease',
+                  minWidth: pct > 0.5 ? '2px' : '0',
+                }}
+              />
+            );
+          })}
+        </div>
+        {/* Legend */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.75rem' }}>
+          {categories.map((cat, idx) => {
+            const colors = [
+              'var(--primary-saffron)', 'var(--primary-magenta)', 'var(--primary-emerald)',
+              'var(--primary-gold)', '#7c3aed', '#0891b2', '#dc2626', '#16a34a',
+            ];
+            return (
+              <span key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: colors[idx % colors.length], flexShrink: 0, display: 'inline-block' }} />
+                {cat.category} ({cat.suggestedPercent}%)
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -167,62 +224,38 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
       >
         <div>
           <span style={{ fontWeight: 700, fontSize: '0.95rem', display: 'block' }}>
-            Deterministic Budget Optimization (Instant TS Math)
+            ✂️ Quick Budget Cut
           </span>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Cut total budget without LLM drift; items re-balance exactly via Largest-Remainder rounding.
+            Instantly reduce total budget — all categories re-balance to the exact rupee using Largest-Remainder math. No AI, no drift.
           </span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            type="button"
-            onClick={() => handleQuickCut(10)}
-            style={{
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--primary-saffron)',
-              background: 'transparent',
-              color: 'var(--primary-saffron)',
-              cursor: 'pointer',
-            }}
-          >
-            Cut 10%
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickCut(20)}
-            style={{
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--primary-saffron)',
-              background: 'var(--primary-saffron)',
-              color: '#ffffff',
-              cursor: 'pointer',
-            }}
-          >
-            Cut 20%
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickCut(30)}
-            style={{
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--primary-saffron)',
-              background: 'transparent',
-              color: 'var(--primary-saffron)',
-              cursor: 'pointer',
-            }}
-          >
-            Cut 30%
-          </button>
+          {[
+            { pct: 10, label: 'Cut 10%', primary: false },
+            { pct: 20, label: 'Cut 20% ⭐', primary: true },
+            { pct: 30, label: 'Cut 30%', primary: false },
+          ].map(({ pct, label, primary }) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => handleQuickCut(pct)}
+              title={`Reduce total budget by ${pct}% — from ${formatINR(totalBudget)} to ${formatINR(Math.round(totalBudget * (1 - pct / 100)))}`}
+              style={{
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--primary-saffron)',
+                background: primary ? 'var(--primary-saffron)' : 'transparent',
+                color: primary ? '#ffffff' : 'var(--primary-saffron)',
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -294,9 +327,31 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
                       >
                         <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
                           {cat.category}
+                          {cat.subEvent && (
+                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: 'var(--primary-magenta)', marginTop: '0.1rem' }}>
+                              {cat.subEvent}
+                            </span>
+                          )}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>
-                          {cat.suggestedPercent}%
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '60px', height: '6px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'rgba(0,0,0,0.08)',
+                              overflow: 'hidden',
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${Math.min(100, cat.suggestedPercent)}%`,
+                                background: 'linear-gradient(90deg, var(--primary-saffron), var(--primary-magenta))',
+                                borderRadius: 'var(--radius-full)',
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', minWidth: '34px' }}>
+                              {cat.suggestedPercent}%
+                            </span>
+                          </div>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
                           {formatINR(cat.amount)}

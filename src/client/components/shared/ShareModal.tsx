@@ -10,12 +10,7 @@ interface ShareModalProps {
   onClose: () => void;
 }
 
-export const ShareModal: React.FC<ShareModalProps> = ({
-  input,
-  plan,
-  isOpen,
-  onClose,
-}) => {
+export const ShareModal: React.FC<ShareModalProps> = ({ input, plan, isOpen, onClose }) => {
   const [shareUrl, setShareUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -97,11 +92,15 @@ ${shareUrl || window.location.href}`;
           ✕
         </button>
 
-        <h2 id="share-modal-title" style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+        <h2
+          id="share-modal-title"
+          style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.5rem' }}
+        >
           Share Celebration Plan 🎉
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Create a secure, read-only link valid for 30 days. Anyone with the link can view your budget, timeline, vendors, and ideas.
+          Create a secure, read-only link valid for 30 days. Anyone with the link can view your
+          budget, timeline, vendors, and ideas.
         </p>
 
         {!shareUrl ? (
@@ -114,7 +113,8 @@ ${shareUrl || window.location.href}`;
               padding: '0.85rem',
               borderRadius: 'var(--radius-md)',
               border: 'none',
-              background: 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
+              background:
+                'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
               color: '#ffffff',
               fontWeight: 700,
               fontSize: '1rem',

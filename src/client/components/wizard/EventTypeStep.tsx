@@ -83,7 +83,9 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
                   ? '2px solid var(--primary-saffron)'
                   : '1px solid var(--surface-border)',
                 background: isSelected ? 'var(--surface-card-hover)' : 'var(--surface-card)',
-                boxShadow: isSelected ? '0 0 0 1px var(--primary-saffron)' : 'var(--surface-shadow)',
+                boxShadow: isSelected
+                  ? '0 0 0 1px var(--primary-saffron)'
+                  : 'var(--surface-shadow)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
@@ -121,7 +123,8 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
               Select Wedding Functions & Ceremonies:
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Each ceremony will receive dedicated timeline milestones, vendors, and budget breakdowns.
+              Each ceremony will receive dedicated timeline milestones, vendors, and budget
+              breakdowns.
             </p>
           </div>
 
@@ -145,7 +148,9 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     borderRadius: 'var(--radius-full)',
-                    border: active ? '1px solid var(--primary-magenta)' : '1px solid var(--surface-border)',
+                    border: active
+                      ? '1px solid var(--primary-magenta)'
+                      : '1px solid var(--surface-border)',
                     background: active ? 'var(--primary-magenta)' : 'transparent',
                     color: active ? '#ffffff' : 'var(--text-main)',
                     cursor: 'pointer',
@@ -199,7 +204,9 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     borderRadius: 'var(--radius-full)',
-                    border: active ? '1px solid var(--primary-emerald)' : '1px solid var(--surface-border)',
+                    border: active
+                      ? '1px solid var(--primary-emerald)'
+                      : '1px solid var(--surface-border)',
                     background: active ? 'var(--primary-emerald)' : 'transparent',
                     color: active ? '#ffffff' : 'var(--text-main)',
                     cursor: 'pointer',

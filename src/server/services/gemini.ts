@@ -13,15 +13,14 @@ import {
 } from '../../shared/schemas.js';
 import { populateCategoryAmounts } from '../../shared/budget.js';
 import { computeMilestoneDate } from '../../shared/timeline.js';
-import {
-  SYSTEM_INSTRUCTION,
-  buildPlanPrompt,
-  buildRefinePrompt,
-} from '../prompts/plan.js';
+import { SYSTEM_INSTRUCTION, buildPlanPrompt, buildRefinePrompt } from '../prompts/plan.js';
 import { createPlanCacheKey, getCachedPlan, setCachedPlan } from './cache.js';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
-const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Default to gemini-3.5-flash (gemini-2.5-flash is deprecated/shutdown).
+// Note: If /api/plan latency approaches the 30s timeout on live deployment,
+// lower the model's thinking level via SDK config (e.g. thinkingConfig: { thinkingBudget: ... }) instead of raising timeout.
+const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 const ai = new GoogleGenAI({ apiKey });
 
@@ -55,7 +54,10 @@ function sanitizeObject<T>(obj: T): T {
 async function withTimeout<T>(promise: Promise<T>, timeoutMs = 30000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(
+      () => reject(new Error(`Operation timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
   });
   try {
     return await Promise.race([promise, timeoutPromise]);
@@ -76,20 +78,75 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
 
   const defaultCategories = isWedding
     ? [
-        { id: nanoid(), category: 'Venue & Staging', suggestedPercent: 30, subEvent: 'Wedding Ceremony' },
-        { id: nanoid(), category: 'Catering & Beverages', suggestedPercent: 30, subEvent: 'Wedding Ceremony' },
-        { id: nanoid(), category: 'Decor & Floral Mandap', suggestedPercent: 15, subEvent: 'Wedding Ceremony' },
-        { id: nanoid(), category: 'Photography & Videography', suggestedPercent: 10, subEvent: 'General' },
-        { id: nanoid(), category: 'Bridal & Groom Attire / Jewellery', suggestedPercent: 10, subEvent: 'General' },
-        { id: nanoid(), category: 'Sound, DJ & Entertainment', suggestedPercent: 5, subEvent: 'Sangeet' },
+        {
+          id: nanoid(),
+          category: 'Venue & Staging',
+          suggestedPercent: 30,
+          subEvent: 'Wedding Ceremony',
+        },
+        {
+          id: nanoid(),
+          category: 'Catering & Beverages',
+          suggestedPercent: 30,
+          subEvent: 'Wedding Ceremony',
+        },
+        {
+          id: nanoid(),
+          category: 'Decor & Floral Mandap',
+          suggestedPercent: 15,
+          subEvent: 'Wedding Ceremony',
+        },
+        {
+          id: nanoid(),
+          category: 'Photography & Videography',
+          suggestedPercent: 10,
+          subEvent: 'General',
+        },
+        {
+          id: nanoid(),
+          category: 'Bridal & Groom Attire / Jewellery',
+          suggestedPercent: 10,
+          subEvent: 'General',
+        },
+        {
+          id: nanoid(),
+          category: 'Sound, DJ & Entertainment',
+          suggestedPercent: 5,
+          subEvent: 'Sangeet',
+        },
       ]
     : isCommunity
       ? [
-          { id: nanoid(), category: 'Pandal & Stage Setup', suggestedPercent: 35, subEvent: 'Pandal Setup' },
-          { id: nanoid(), category: 'Sound, Lighting & Permissions', suggestedPercent: 20, subEvent: 'General' },
-          { id: nanoid(), category: 'Bhandara / Prasad Catering', suggestedPercent: 25, subEvent: 'Bhandara / Prasad' },
-          { id: nanoid(), category: 'Cultural Artists & Emcee', suggestedPercent: 10, subEvent: 'Cultural Night / Garba' },
-          { id: nanoid(), category: 'Security, Sanitization & Waste', suggestedPercent: 10, subEvent: 'General' },
+          {
+            id: nanoid(),
+            category: 'Pandal & Stage Setup',
+            suggestedPercent: 35,
+            subEvent: 'Pandal Setup',
+          },
+          {
+            id: nanoid(),
+            category: 'Sound, Lighting & Permissions',
+            suggestedPercent: 20,
+            subEvent: 'General',
+          },
+          {
+            id: nanoid(),
+            category: 'Bhandara / Prasad Catering',
+            suggestedPercent: 25,
+            subEvent: 'Bhandara / Prasad',
+          },
+          {
+            id: nanoid(),
+            category: 'Cultural Artists & Emcee',
+            suggestedPercent: 10,
+            subEvent: 'Cultural Night / Garba',
+          },
+          {
+            id: nanoid(),
+            category: 'Security, Sanitization & Waste',
+            suggestedPercent: 10,
+            subEvent: 'General',
+          },
         ]
       : [
           { id: nanoid(), category: 'Venue & Atmosphere Decor', suggestedPercent: 30 },
@@ -103,39 +160,196 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
 
   const defaultMilestones = isWedding
     ? [
-        { id: nanoid(), title: 'Book Venue & Dates', description: 'Finalize and lock in the main venue', daysBeforeEvent: 120, date: computeMilestoneDate(input.eventDate, 120), subEvent: 'Wedding Ceremony', completed: false },
-        { id: nanoid(), title: 'Caterer Food Tasting', description: 'Sample menu items and freeze counters', daysBeforeEvent: 60, date: computeMilestoneDate(input.eventDate, 60), subEvent: 'Wedding Ceremony', completed: false },
-        { id: nanoid(), title: 'Mehendi & Sangeet Playlist', description: 'Confirm choreography & song list', daysBeforeEvent: 20, date: computeMilestoneDate(input.eventDate, 20), subEvent: 'Sangeet', completed: false },
-        { id: nanoid(), title: 'Wedding Ceremony & Pheras', description: 'The auspicious main day', daysBeforeEvent: 0, date: input.eventDate, subEvent: 'Wedding Ceremony', completed: false },
+        {
+          id: nanoid(),
+          title: 'Book Venue & Dates',
+          description: 'Finalize and lock in the main venue',
+          daysBeforeEvent: 120,
+          date: computeMilestoneDate(input.eventDate, 120),
+          subEvent: 'Wedding Ceremony',
+          completed: false,
+        },
+        {
+          id: nanoid(),
+          title: 'Caterer Food Tasting',
+          description: 'Sample menu items and freeze counters',
+          daysBeforeEvent: 60,
+          date: computeMilestoneDate(input.eventDate, 60),
+          subEvent: 'Wedding Ceremony',
+          completed: false,
+        },
+        {
+          id: nanoid(),
+          title: 'Mehendi & Sangeet Playlist',
+          description: 'Confirm choreography & song list',
+          daysBeforeEvent: 20,
+          date: computeMilestoneDate(input.eventDate, 20),
+          subEvent: 'Sangeet',
+          completed: false,
+        },
+        {
+          id: nanoid(),
+          title: 'Wedding Ceremony & Pheras',
+          description: 'The auspicious main day',
+          daysBeforeEvent: 0,
+          date: input.eventDate,
+          subEvent: 'Wedding Ceremony',
+          completed: false,
+        },
       ]
     : isCommunity
       ? [
-          { id: nanoid(), title: 'Apply for Police & Municipal NOC', description: 'Submit paperwork for sound and pandal permissions', daysBeforeEvent: 30, date: computeMilestoneDate(input.eventDate, 30), subEvent: 'General', completed: false },
-          { id: nanoid(), title: 'Pandal Erection & Electrical Inspection', description: 'Set up temporary structure and fire safety checks', daysBeforeEvent: 3, date: computeMilestoneDate(input.eventDate, 3), subEvent: 'Pandal Setup', completed: false },
-          { id: nanoid(), title: 'Festival Celebration & Mahaprasad', description: 'Main event day and community gathering', daysBeforeEvent: 0, date: input.eventDate, subEvent: 'Bhandara / Prasad', completed: false },
+          {
+            id: nanoid(),
+            title: 'Apply for Police & Municipal NOC',
+            description: 'Submit paperwork for sound and pandal permissions',
+            daysBeforeEvent: 30,
+            date: computeMilestoneDate(input.eventDate, 30),
+            subEvent: 'General',
+            completed: false,
+          },
+          {
+            id: nanoid(),
+            title: 'Pandal Erection & Electrical Inspection',
+            description: 'Set up temporary structure and fire safety checks',
+            daysBeforeEvent: 3,
+            date: computeMilestoneDate(input.eventDate, 3),
+            subEvent: 'Pandal Setup',
+            completed: false,
+          },
+          {
+            id: nanoid(),
+            title: 'Festival Celebration & Mahaprasad',
+            description: 'Main event day and community gathering',
+            daysBeforeEvent: 0,
+            date: input.eventDate,
+            subEvent: 'Bhandara / Prasad',
+            completed: false,
+          },
         ]
       : [
-          { id: nanoid(), title: 'Finalize Guest List & Theme', description: 'Confirm expected attendees', daysBeforeEvent: 21, date: computeMilestoneDate(input.eventDate, 21), completed: false },
-          { id: nanoid(), title: 'Order Custom Cake & Treats', description: 'Pick flavor and custom topper design', daysBeforeEvent: 7, date: computeMilestoneDate(input.eventDate, 7), completed: false },
-          { id: nanoid(), title: 'Birthday Celebration Day!', description: 'Enjoy the party with family and friends', daysBeforeEvent: 0, date: input.eventDate, completed: false },
+          {
+            id: nanoid(),
+            title: 'Finalize Guest List & Theme',
+            description: 'Confirm expected attendees',
+            daysBeforeEvent: 21,
+            date: computeMilestoneDate(input.eventDate, 21),
+            completed: false,
+          },
+          {
+            id: nanoid(),
+            title: 'Order Custom Cake & Treats',
+            description: 'Pick flavor and custom topper design',
+            daysBeforeEvent: 7,
+            date: computeMilestoneDate(input.eventDate, 7),
+            completed: false,
+          },
+          {
+            id: nanoid(),
+            title: 'Birthday Celebration Day!',
+            description: 'Enjoy the party with family and friends',
+            daysBeforeEvent: 0,
+            date: input.eventDate,
+            completed: false,
+          },
         ];
 
   const defaultVendors = isCommunity
     ? [
-        { id: nanoid(), category: 'Municipal & Police Clearances', questionsToAsk: ['What is the sound cutoff time (10 PM)?', 'Is a dedicated fire extinguisher setup required?'], bookByDaysBeforeEvent: 30, bookByDate: computeMilestoneDate(input.eventDate, 30), status: 'to-contact' as const, quotedAmount: 0, budgetedAmount: enrichedBudget.find(b => b.category.includes('Permission'))?.amount || 0, subEvent: 'General' },
-        { id: nanoid(), category: 'Pandal & Tent Contractor', questionsToAsk: ['Are waterproof materials used?', 'Are emergency exits planned?'], bookByDaysBeforeEvent: 20, bookByDate: computeMilestoneDate(input.eventDate, 20), status: 'to-contact' as const, quotedAmount: 0, budgetedAmount: enrichedBudget.find(b => b.category.includes('Pandal'))?.amount || 0, subEvent: 'Pandal Setup' },
+        {
+          id: nanoid(),
+          category: 'Municipal & Police Clearances',
+          questionsToAsk: [
+            'What is the sound cutoff time (10 PM)?',
+            'Is a dedicated fire extinguisher setup required?',
+          ],
+          bookByDaysBeforeEvent: 30,
+          bookByDate: computeMilestoneDate(input.eventDate, 30),
+          status: 'to-contact' as const,
+          quotedAmount: 0,
+          budgetedAmount:
+            enrichedBudget.find((b) => b.category.includes('Permission'))?.amount || 0,
+          subEvent: 'General',
+        },
+        {
+          id: nanoid(),
+          category: 'Pandal & Tent Contractor',
+          questionsToAsk: ['Are waterproof materials used?', 'Are emergency exits planned?'],
+          bookByDaysBeforeEvent: 20,
+          bookByDate: computeMilestoneDate(input.eventDate, 20),
+          status: 'to-contact' as const,
+          quotedAmount: 0,
+          budgetedAmount: enrichedBudget.find((b) => b.category.includes('Pandal'))?.amount || 0,
+          subEvent: 'Pandal Setup',
+        },
       ]
     : [
-        { id: nanoid(), category: 'Catering & Live Counters', questionsToAsk: ['Do you provide live counters?', 'What is your staff-to-guest ratio?'], bookByDaysBeforeEvent: 45, bookByDate: computeMilestoneDate(input.eventDate, 45), status: 'to-contact' as const, quotedAmount: 0, budgetedAmount: enrichedBudget.find(b => b.category.includes('Catering') || b.category.includes('Food'))?.amount || 0 },
-        { id: nanoid(), category: 'Floral & Thematic Decorator', questionsToAsk: ['Can we do a mockup preview?', 'Are real or artificial flowers used?'], bookByDaysBeforeEvent: 30, bookByDate: computeMilestoneDate(input.eventDate, 30), status: 'to-contact' as const, quotedAmount: 0, budgetedAmount: enrichedBudget.find(b => b.category.includes('Decor'))?.amount || 0 },
+        {
+          id: nanoid(),
+          category: 'Catering & Live Counters',
+          questionsToAsk: ['Do you provide live counters?', 'What is your staff-to-guest ratio?'],
+          bookByDaysBeforeEvent: 45,
+          bookByDate: computeMilestoneDate(input.eventDate, 45),
+          status: 'to-contact' as const,
+          quotedAmount: 0,
+          budgetedAmount:
+            enrichedBudget.find(
+              (b) => b.category.includes('Catering') || b.category.includes('Food'),
+            )?.amount || 0,
+        },
+        {
+          id: nanoid(),
+          category: 'Floral & Thematic Decorator',
+          questionsToAsk: ['Can we do a mockup preview?', 'Are real or artificial flowers used?'],
+          bookByDaysBeforeEvent: 30,
+          bookByDate: computeMilestoneDate(input.eventDate, 30),
+          status: 'to-contact' as const,
+          quotedAmount: 0,
+          budgetedAmount: enrichedBudget.find((b) => b.category.includes('Decor'))?.amount || 0,
+        },
       ];
 
   const defaultIdeas: Idea[] = [
-    { id: nanoid(), section: 'theme', title: 'Marigold Sunshine & Desi Vibe', description: 'Vibrant yellow and orange florals with brass bells, earthen diyas, and festive fabric drapes.', estimatedCost: '₹15,000-₹30,000' },
-    { id: nanoid(), section: 'decor', title: 'Floral Mandap / Photobooth with Rickshaw', description: 'Quirky painted auto-rickshaw photo corner decorated with marigold garlands and fairy lights.', estimatedCost: '₹10,000-₹25,000' },
-    { id: nanoid(), section: 'food', title: 'Live Chaat & Jalebi Rabri Counters', description: 'Hot piping pani puri, aloo tikki, and fresh jalebi made live in front of guests.', estimatedCost: '₹350-₹600 per plate' },
-    { id: nanoid(), section: 'activities', title: 'Dhol Tasha & Antakshari Face-off', description: 'Energizing beats to bring both sides together for friendly competition and dancing.', estimatedCost: '₹8,000-₹15,000' },
-    { id: nanoid(), section: 'returnGifts', title: 'Eco-Friendly Seed Paper & Mithai Boxes', description: 'Handcrafted box with traditional artisanal sweets and plantable seed paper tags.', estimatedCost: '₹200-₹400 per guest' },
+    {
+      id: nanoid(),
+      section: 'theme',
+      title: 'Marigold Sunshine & Desi Vibe',
+      description:
+        'Vibrant yellow and orange florals with brass bells, earthen diyas, and festive fabric drapes.',
+      estimatedCost: '₹15,000-₹30,000',
+    },
+    {
+      id: nanoid(),
+      section: 'decor',
+      title: 'Floral Mandap / Photobooth with Rickshaw',
+      description:
+        'Quirky painted auto-rickshaw photo corner decorated with marigold garlands and fairy lights.',
+      estimatedCost: '₹10,000-₹25,000',
+    },
+    {
+      id: nanoid(),
+      section: 'food',
+      title: 'Live Chaat & Jalebi Rabri Counters',
+      description:
+        'Hot piping pani puri, aloo tikki, and fresh jalebi made live in front of guests.',
+      estimatedCost: '₹350-₹600 per plate',
+    },
+    {
+      id: nanoid(),
+      section: 'activities',
+      title: 'Dhol Tasha & Antakshari Face-off',
+      description:
+        'Energizing beats to bring both sides together for friendly competition and dancing.',
+      estimatedCost: '₹8,000-₹15,000',
+    },
+    {
+      id: nanoid(),
+      section: 'returnGifts',
+      title: 'Eco-Friendly Seed Paper & Mithai Boxes',
+      description:
+        'Handcrafted box with traditional artisanal sweets and plantable seed paper tags.',
+      estimatedCost: '₹200-₹400 per guest',
+    },
   ];
 
   return {
@@ -173,9 +387,10 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
 
   const enrichedVendors = raw.vendors.map((v) => {
     // Attempt matching budgeted amount with relevant category
-    const matchedCategory = enrichedBudget.find((b) =>
-      b.category.toLowerCase().includes(v.category.toLowerCase()) ||
-      v.category.toLowerCase().includes(b.category.toLowerCase())
+    const matchedCategory = enrichedBudget.find(
+      (b) =>
+        b.category.toLowerCase().includes(v.category.toLowerCase()) ||
+        v.category.toLowerCase().includes(b.category.toLowerCase()),
     );
     return {
       id: nanoid(),
@@ -210,20 +425,26 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
 
 /**
  * Call Gemini API with structured response schema, 30s timeout, and 1 retry with backoff.
- * Returns enriched plan, or falls back gracefully on repeated failure.
+ * Returns enriched plan and meta source ('gemini' | 'cache' | 'fallback').
  */
-export async function generateEventPlan(input: WizardInput): Promise<{ plan: PlanOutput; isFallback: boolean }> {
+export async function generateEventPlan(
+  input: WizardInput,
+): Promise<{ plan: PlanOutput; source: 'gemini' | 'cache' | 'fallback' }> {
   // Check LRU cache
   const cacheKey = createPlanCacheKey(input as unknown as Record<string, unknown>);
   const cached = getCachedPlan(cacheKey);
   if (cached) {
-    return { plan: cached, isFallback: false };
+    console.info(
+      `[Plan Generation] Source: cache (Event: ${input.eventType}, City: ${input.city})`,
+    );
+    return { plan: cached, source: 'cache' };
   }
 
   // If no API key configured (e.g. initial dev or test), return fallback
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    console.info('[Plan Generation] Source: fallback (GEMINI_API_KEY not configured)');
     const fallback = generateFallbackPlan(input);
-    return { plan: fallback, isFallback: true };
+    return { plan: fallback, source: 'fallback' };
   }
 
   const prompt = buildPlanPrompt(input);
@@ -244,7 +465,7 @@ export async function generateEventPlan(input: WizardInput): Promise<{ plan: Pla
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           responseMimeType: 'application/json',
-          responseSchema: jsonSchema,
+          responseJsonSchema: jsonSchema,
           temperature: 0.7,
         },
       });
@@ -258,28 +479,36 @@ export async function generateEventPlan(input: WizardInput): Promise<{ plan: Pla
       const enriched = enrichRawPlan(validated, input);
       setCachedPlan(cacheKey, enriched);
 
-      return { plan: enriched, isFallback: false };
+      console.info(
+        `[Plan Generation] Source: gemini (Model: ${modelName}, Event: ${input.eventType})`,
+      );
+      return { plan: enriched, source: 'gemini' };
     } catch (err) {
       _lastError = err instanceof Error ? err : new Error(String(err));
     }
   }
 
   // If both attempts failed, return graceful fallback plan
+  console.warn(
+    `[Plan Generation] Source: fallback (Gemini error: ${_lastError?.message || 'unknown'})`,
+  );
   const fallback = generateFallbackPlan(input);
-  return { plan: fallback, isFallback: true };
+  return { plan: fallback, source: 'fallback' };
 }
 
 /**
  * Refine ideas for a specific section via Gemini with retry and fallback.
+ * Returns refined ideas and meta source ('gemini' | 'fallback').
  */
 export async function refineIdeasSection(
   section: IdeaSection,
   instruction: string,
   input: WizardInput,
   currentIdeas: Idea[],
-): Promise<Idea[]> {
+): Promise<{ ideas: Idea[]; source: 'gemini' | 'fallback' }> {
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    return currentIdeas;
+    console.info('[Refine Section] Source: fallback (GEMINI_API_KEY not configured)');
+    return { ideas: currentIdeas, source: 'fallback' };
   }
 
   const prompt = buildRefinePrompt(section, instruction, input);
@@ -297,7 +526,7 @@ export async function refineIdeasSection(
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           responseMimeType: 'application/json',
-          responseSchema: jsonSchema,
+          responseJsonSchema: jsonSchema,
           temperature: 0.8,
         },
       });
@@ -308,7 +537,7 @@ export async function refineIdeasSection(
       const sanitized = sanitizeObject(parsed);
       const validated = geminiRefineOutputSchema.parse(sanitized);
 
-      return validated.ideas.map((raw) => ({
+      const ideas = validated.ideas.map((raw) => ({
         id: nanoid(),
         section: raw.section,
         title: raw.title,
@@ -316,10 +545,14 @@ export async function refineIdeasSection(
         estimatedCost: raw.estimatedCost,
         subEvent: raw.subEvent,
       }));
+
+      console.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
+      return { ideas, source: 'gemini' };
     } catch {
       // Continue loop for retry
     }
   }
 
-  return currentIdeas;
+  console.warn(`[Refine Section] Source: fallback (Gemini API failed for section ${section})`);
+  return { ideas: currentIdeas, source: 'fallback' };
 }

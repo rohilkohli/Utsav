@@ -20,10 +20,15 @@ const STEPS = [
   { id: 5, label: 'Review' },
 ];
 
-export const WizardShell: React.FC<WizardShellProps> = ({
-  onGeneratePlan,
-  isGenerating,
-}) => {
+const STEP_TIPS: Record<number, { icon: string; tip: string }> = {
+  1: { icon: '💡', tip: 'Selecting ceremonies here lets Gemini generate dedicated budgets, milestones, and vendor questions per function — e.g. Haldi gets separate Haldi-specific vendors.' },
+  2: { icon: '🗺️', tip: 'Your city shapes vendor market pricing and booking lead times. IST date ensures milestones are calculated correctly across time zones.' },
+  3: { icon: '💰', tip: 'Rupee allocations are calculated by our deterministic TypeScript engine — never by AI. No hallucinated prices. Total will sum exactly to your budget.' },
+  4: { icon: '✨', tip: 'The more specific your theme & cultural notes, the more personalized Gemini\'s ideas will be. Try: "Rajasthani heritage with marigold arches & folk music".' },
+  5: { icon: '🚀', tip: 'Review everything before generating. Once your plan is ready, you can share it via WhatsApp, export a .ics calendar, and refine individual sections.' },
+};
+
+export const WizardShell: React.FC<WizardShellProps> = ({ onGeneratePlan, isGenerating }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<WizardInput>({
     eventType: 'wedding',
@@ -138,9 +143,10 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                     justifyContent: 'center',
                     fontWeight: 700,
                     fontSize: '0.9rem',
-                    background: isCompleted || isCurrent
-                      ? 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)'
-                      : 'rgba(0,0,0,0.06)',
+                    background:
+                      isCompleted || isCurrent
+                        ? 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)'
+                        : 'rgba(0,0,0,0.06)',
                     color: isCompleted || isCurrent ? '#ffffff' : 'var(--text-light)',
                     boxShadow: isCurrent ? '0 0 0 4px rgba(230, 81, 0, 0.2)' : 'none',
                     transition: 'all 0.2s ease',
@@ -162,6 +168,26 @@ export const WizardShell: React.FC<WizardShellProps> = ({
           })}
         </ol>
       </nav>
+
+      {/* Step Tip Banner */}
+      {STEP_TIPS[step] && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.6rem',
+          background: 'linear-gradient(135deg, rgba(255,111,0,0.06) 0%, rgba(194,24,91,0.06) 100%)',
+          border: '1px solid rgba(230,81,0,0.2)',
+          borderRadius: 'var(--radius-md)',
+          padding: '0.75rem 1rem',
+          marginBottom: '1.5rem',
+          fontSize: '0.85rem',
+          color: 'var(--text-muted)',
+          lineHeight: 1.5,
+        }}>
+          <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '0.05rem' }}>{STEP_TIPS[step].icon}</span>
+          <span>{STEP_TIPS[step].tip}</span>
+        </div>
+      )}
 
       {/* Wizard Steps */}
       <div style={{ minHeight: '340px' }}>
@@ -199,7 +225,9 @@ export const WizardShell: React.FC<WizardShellProps> = ({
             onChangeTheme={(theme) => setFormData((p) => ({ ...p, theme }))}
             onToggleDietary={handleToggleDietary}
             onChangeCulturalNotes={(culturalNotes) => setFormData((p) => ({ ...p, culturalNotes }))}
-            onChangeLanguage={(language: OutputLanguage) => setFormData((p) => ({ ...p, language }))}
+            onChangeLanguage={(language: OutputLanguage) =>
+              setFormData((p) => ({ ...p, language }))
+            }
           />
         )}
         {step === 5 && (
@@ -252,9 +280,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
               padding: '0.6rem 1.8rem',
               borderRadius: 'var(--radius-md)',
               border: 'none',
-              background: canProceed()
-                ? 'var(--primary-saffron)'
-                : 'rgba(0,0,0,0.1)',
+              background: canProceed() ? 'var(--primary-saffron)' : 'rgba(0,0,0,0.1)',
               color: '#ffffff',
               fontWeight: 700,
               cursor: canProceed() ? 'pointer' : 'not-allowed',

@@ -7,6 +7,9 @@ import configRoutes from './routes/config.js';
 import planRoutes from './routes/plan.js';
 import refineRoutes from './routes/refine.js';
 import shareRoutes from './routes/share.js';
+import vendorRoutes from './routes/vendors.js';
+import { validateEnv } from './env.js';
+import { initRepositories } from './repositories/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,11 +23,11 @@ export function createApp(): express.Application {
   // Gzip / Brotli response compression
   app.use(compression());
 
-  // Security headers with CSP
+  // Security headers with CSP & COOP
   app.use(securityHeaders);
 
-  // Tight JSON body parsing (1MB max to guard against payload bombs)
-  app.use(express.json({ limit: '1mb' }));
+  // Note: Per-route express.json() parsers are mounted directly on POST/PUT endpoints
+  // to ensure generationLimiter executes BEFORE body parsing/validation on AI endpoints.
 
   // API Health Check
   app.get('/api/health', (_req, res) => {
@@ -36,6 +39,7 @@ export function createApp(): express.Application {
   app.use('/api', planRoutes);
   app.use('/api', refineRoutes);
   app.use('/api', shareRoutes);
+  app.use('/api', vendorRoutes);
 
   // In production or when client is built, serve client assets
   const clientDist = path.resolve(__dirname, '../client');
@@ -75,9 +79,17 @@ export function createApp(): express.Application {
 }
 
 const app = createApp();
-const PORT = parseInt(process.env.PORT || '8080', 10);
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 if (process.env.NODE_ENV !== 'test') {
+  try {
+    validateEnv();
+    initRepositories();
+  } catch (err) {
+    process.stderr.write(`${(err as Error).message}\n`);
+    process.exit(1);
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     process.stdout.write(`🎉 Utsav server running on port ${PORT}\n`);
   });

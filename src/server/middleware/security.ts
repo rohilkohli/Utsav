@@ -10,7 +10,7 @@ export const securityHeaders: RequestHandler = helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", 'https://apis.google.com'],
       styleSrc: ["'self'", "'unsafe-inline'"],
       fontSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
+      imgSrc: ["'self'", 'data:', 'https://lh3.googleusercontent.com', 'https:'],
       connectSrc: [
         "'self'",
         'https://*.googleapis.com',
@@ -28,5 +28,6 @@ export const securityHeaders: RequestHandler = helmet({
       upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
     },
   },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   crossOriginEmbedderPolicy: false,
 });

@@ -30,10 +30,7 @@ function toICSDate(dateStr: string): string {
  * Generates an RFC 5545 compliant .ics file content string with CRLF endings.
  */
 export function generateICS(events: CalendarEvent[]): string {
-  const now = new Date()
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .slice(0, 15) + 'Z';
+  const now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',

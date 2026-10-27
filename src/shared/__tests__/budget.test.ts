@@ -103,8 +103,22 @@ describe('Budget Math - Deterministic Allocation', () => {
 
   it('groups categories correctly by subEvent', () => {
     const categories = [
-      { id: '1', category: 'Haldi Stage', suggestedPercent: 30, amount: 30, actual: 30, subEvent: 'Haldi' },
-      { id: '2', category: 'DJ & Sound', suggestedPercent: 40, amount: 40, actual: 40, subEvent: 'Sangeet' },
+      {
+        id: '1',
+        category: 'Haldi Stage',
+        suggestedPercent: 30,
+        amount: 30,
+        actual: 30,
+        subEvent: 'Haldi',
+      },
+      {
+        id: '2',
+        category: 'DJ & Sound',
+        suggestedPercent: 40,
+        amount: 40,
+        actual: 40,
+        subEvent: 'Sangeet',
+      },
       { id: '3', category: 'Priest Dakshina', suggestedPercent: 30, amount: 30, actual: 30 },
     ];
     const grouped = groupCategoriesBySubEvent(categories);

@@ -16,9 +16,10 @@ export function buildPlanPrompt(input: WizardInput): string {
   let specificContext = '';
 
   if (input.eventType === 'wedding') {
-    const subEventsStr = input.subEvents.length > 0
-      ? input.subEvents.join(', ')
-      : 'Haldi, Mehendi, Sangeet, Wedding Ceremony, Reception';
+    const subEventsStr =
+      input.subEvents.length > 0
+        ? input.subEvents.join(', ')
+        : 'Haldi, Mehendi, Sangeet, Wedding Ceremony, Reception';
 
     specificContext = `
 EVENT TYPE: Indian Wedding
@@ -30,7 +31,10 @@ REQUIREMENTS:
 - Vendors: Include pandit/priest, mehndi artist, makeup artist (MUA), dhol/DJ/sound, decorator, and caterer. Each vendor must include 2-4 sharp, practical questions to ask them.
 - Ideas: Provide at least 5 rich, personalized ideas across: theme, decor, food, activities, returnGifts.`;
   } else if (input.eventType === 'community') {
-    const subEventsStr = input.subEvents.length > 0 ? input.subEvents.join(', ') : 'Pandal Setup, Cultural Night, Visarjan';
+    const subEventsStr =
+      input.subEvents.length > 0
+        ? input.subEvents.join(', ')
+        : 'Pandal Setup, Cultural Night, Visarjan';
     specificContext = `
 EVENT TYPE: Indian Community Celebration / Festival (e.g., Diwali Mela, Ganesh Utsav, Navratri Garba, Society Sports Day)
 CEREMONIES / STAGES: ${subEventsStr}
@@ -52,9 +56,10 @@ REQUIREMENTS:
 - Ideas: Engaging activities, signature welcome drinks, themed photo-op booth, and personalized return gifts.`;
   }
 
-  const dietaryStr = input.dietaryPreferences.length > 0
-    ? `Dietary Constraints: ${input.dietaryPreferences.join(', ')}`
-    : 'Dietary Constraints: Standard options (mix of vegetarian/non-vegetarian as per city customs)';
+  const dietaryStr =
+    input.dietaryPreferences.length > 0
+      ? `Dietary Constraints: ${input.dietaryPreferences.join(', ')}`
+      : 'Dietary Constraints: Standard options (mix of vegetarian/non-vegetarian as per city customs)';
 
   const culturalStr = input.culturalNotes.trim()
     ? `Cultural Traditions / Custom Notes: ${input.culturalNotes}`

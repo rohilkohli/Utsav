@@ -39,7 +39,8 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
                 style={{
                   fontSize: '1.4rem',
                   fontWeight: 700,
-                  background: 'linear-gradient(90deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
+                  background:
+                    'linear-gradient(90deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   margin: 0,
@@ -106,7 +107,21 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
               <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>(Sign In)</span>
             </button>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              {user?.photoURL && (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'User profile'}
+                  referrerPolicy="no-referrer"
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '1px solid var(--surface-border)',
+                  }}
+                />
+              )}
               <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>
                 {user?.displayName || user?.email || 'User'}
               </span>

@@ -1,18 +1,13 @@
 import type {
   WizardInput,
   PlanOutput,
-  GeneratePlanResponse,
-  RefineSectionResponse,
-  PublicConfig,
-  SavedPlan,
   IdeaSection,
-} from '@shared/schemas';
-
-export interface ShareResponse {
-  shareToken: string;
-  shareUrl: string;
-  expiresAt: string;
-}
+  PublicConfig,
+  GeneratePlanResponse,
+  SavedPlan,
+  RefineSectionResponse,
+  ShareResponse,
+} from '../../shared/schemas.js';
 
 export async function fetchRuntimeConfig(): Promise<PublicConfig> {
   const res = await fetch('/api/config');
@@ -20,10 +15,15 @@ export async function fetchRuntimeConfig(): Promise<PublicConfig> {
   return res.json();
 }
 
-export async function apiGeneratePlan(input: WizardInput): Promise<GeneratePlanResponse> {
+export async function apiGeneratePlan(input: WizardInput, token?: string): Promise<GeneratePlanResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch('/api/plan', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ input }),
   });
   if (!res.ok) {
@@ -56,10 +56,7 @@ export async function apiRefineSection(
   return res.json();
 }
 
-export async function apiCreateShare(
-  input: WizardInput,
-  plan: PlanOutput,
-): Promise<ShareResponse> {
+export async function apiCreateShare(input: WizardInput, plan: PlanOutput): Promise<ShareResponse> {
   const res = await fetch('/api/share', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -79,19 +76,70 @@ export async function apiGetSharedPlan(token: string): Promise<SavedPlan> {
   return res.json();
 }
 
-export async function apiGetPlan(id: string): Promise<SavedPlan> {
-  const res = await fetch(`/api/plan/${id}`);
+export async function apiGetPlan(id: string, token?: string): Promise<SavedPlan> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`/api/plan/${id}`, { headers });
   if (!res.ok) {
     throw new Error('Plan not found');
   }
   return res.json();
 }
 
-export async function apiUpdatePlan(plan: SavedPlan): Promise<void> {
+export async function apiSavePlan(input: WizardInput, plan: PlanOutput, token: string): Promise<SavedPlan> {
+  const res = await fetch('/api/plan/save', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ input, plan }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to save plan');
+  }
+  const data = await res.json();
+  return data.plan;
+}
+
+export interface VendorSuggestion {
+  name: string;
+  phone?: string;
+  address?: string;
+  rating?: number;
+  mapsUrl?: string;
+  website?: string;
+}
+
+export async function apiSearchVendors(
+  category: string,
+  city: string,
+  subEvent?: string,
+): Promise<VendorSuggestion[]> {
+  const res = await fetch('/api/vendors/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, city, subEvent }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Vendor search failed');
+  }
+  const data = await res.json();
+  return data.suggestions as VendorSuggestion[];
+}
+
+export async function apiUpdatePlan(plan: SavedPlan, token?: string): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`/api/plan/${plan.id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(plan),
+    headers,
+    body: JSON.stringify({ input: plan.input, plan: plan.plan }),
   });
   if (!res.ok) {
     throw new Error('Failed to update plan');

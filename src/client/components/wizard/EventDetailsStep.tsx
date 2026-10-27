@@ -70,7 +70,14 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
             fontSize: '1rem',
           }}
         />
-        <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '0.25rem' }}>
+        <span
+          style={{
+            display: 'block',
+            fontSize: '0.8rem',
+            color: 'var(--text-light)',
+            marginTop: '0.25rem',
+          }}
+        >
           Date is evaluated in Asia/Kolkata timezone.
         </span>
       </div>
@@ -169,7 +176,9 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
         />
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Or type exact count:</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Or type exact count:
+          </span>
           <input
             type="number"
             min={0}

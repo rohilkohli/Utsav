@@ -50,7 +50,11 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
         >
           Plan Output Language:
         </label>
-        <div role="radiogroup" aria-labelledby="language-selection-label" style={{ display: 'flex', gap: '0.75rem' }}>
+        <div
+          role="radiogroup"
+          aria-labelledby="language-selection-label"
+          style={{ display: 'flex', gap: '0.75rem' }}
+        >
           <button
             type="button"
             role="radio"
@@ -61,10 +65,12 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
               maxWidth: '180px',
               padding: '0.75rem',
               borderRadius: 'var(--radius-md)',
-              border: language === 'english'
-                ? '2px solid var(--primary-saffron)'
-                : '1px solid var(--surface-border)',
-              background: language === 'english' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
+              border:
+                language === 'english'
+                  ? '2px solid var(--primary-saffron)'
+                  : '1px solid var(--surface-border)',
+              background:
+                language === 'english' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
               color: 'var(--text-main)',
               fontWeight: 600,
               cursor: 'pointer',
@@ -82,10 +88,12 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
               maxWidth: '180px',
               padding: '0.75rem',
               borderRadius: 'var(--radius-md)',
-              border: language === 'hindi'
-                ? '2px solid var(--primary-saffron)'
-                : '1px solid var(--surface-border)',
-              background: language === 'hindi' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
+              border:
+                language === 'hindi'
+                  ? '2px solid var(--primary-saffron)'
+                  : '1px solid var(--surface-border)',
+              background:
+                language === 'hindi' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
               color: 'var(--text-main)',
               fontWeight: 600,
               cursor: 'pointer',
@@ -145,7 +153,9 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
                   fontSize: '0.85rem',
                   fontWeight: 500,
                   borderRadius: 'var(--radius-full)',
-                  border: active ? '1px solid var(--primary-emerald)' : '1px solid var(--surface-border)',
+                  border: active
+                    ? '1px solid var(--primary-emerald)'
+                    : '1px solid var(--surface-border)',
                   background: active ? 'var(--primary-emerald)' : 'var(--surface-card)',
                   color: active ? '#ffffff' : 'var(--text-main)',
                   cursor: 'pointer',

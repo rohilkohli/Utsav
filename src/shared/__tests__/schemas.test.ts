@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { z } from 'zod';
 import {
   wizardInputSchema,
   refineInputSchema,
+  planOutputSchema,
   getGeminiPlanJsonSchema,
   getGeminiRefineJsonSchema,
 } from '../schemas.js';
@@ -113,13 +115,32 @@ describe('Zod Schemas - Single Source of Truth Validation', () => {
     ).toBe(false);
   });
 
-  it('generates valid JSON schemas for Gemini structured outputs', () => {
-    const planSchema = getGeminiPlanJsonSchema();
+  it('generates valid JSON schemas via z.toJSONSchema with non-empty properties and all required keys', () => {
+    const planSchema = getGeminiPlanJsonSchema() as Record<string, unknown>;
     expect(planSchema).toBeDefined();
     expect(typeof planSchema).toBe('object');
+    expect(planSchema.properties).toBeDefined();
+    expect(Object.keys(planSchema.properties as Record<string, unknown>).length).toBeGreaterThan(0);
+    expect(planSchema.required).toEqual(
+      expect.arrayContaining(['summary', 'budget', 'timeline', 'vendors', 'ideas']),
+    );
 
-    const refineSchema = getGeminiRefineJsonSchema();
+    const planOutputJson = z.toJSONSchema(planOutputSchema) as Record<string, unknown>;
+    expect(planOutputJson.properties).toBeDefined();
+    expect(
+      Object.keys(planOutputJson.properties as Record<string, unknown>).length,
+    ).toBeGreaterThan(0);
+    expect(planOutputJson.required).toEqual(
+      expect.arrayContaining(['summary', 'budget', 'timeline', 'vendors', 'ideas']),
+    );
+
+    const refineSchema = getGeminiRefineJsonSchema() as Record<string, unknown>;
     expect(refineSchema).toBeDefined();
     expect(typeof refineSchema).toBe('object');
+    expect(refineSchema.properties).toBeDefined();
+    expect(Object.keys(refineSchema.properties as Record<string, unknown>).length).toBeGreaterThan(
+      0,
+    );
+    expect(refineSchema.required).toEqual(expect.arrayContaining(['ideas']));
   });
 });
