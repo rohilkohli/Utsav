@@ -11,6 +11,8 @@ interface DashboardShellProps {
   input: WizardInput;
   plan: PlanOutput;
   isFallback?: boolean;
+  activeTab?: 'budget' | 'timeline' | 'vendors' | 'ideas';
+  onTabChange?: (tab: 'budget' | 'timeline' | 'vendors' | 'ideas') => void;
   onUpdatePlan: (updated: PlanOutput, newBudget?: number) => void;
   onNewPlan: () => void;
 }
@@ -21,10 +23,14 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   input,
   plan,
   isFallback,
+  activeTab: controlledTab,
+  onTabChange,
   onUpdatePlan,
   onNewPlan,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('budget');
+  const [internalTab, setInternalTab] = useState<TabType>('budget');
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = (t: TabType) => { setInternalTab(t); onTabChange?.(t); };
   const [isShareOpen, setIsShareOpen] = useState(false);
   const { user, login } = useAuth();
 

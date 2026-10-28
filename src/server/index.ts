@@ -8,6 +8,7 @@ import planRoutes from './routes/plan.js';
 import refineRoutes from './routes/refine.js';
 import shareRoutes from './routes/share.js';
 import vendorRoutes from './routes/vendors.js';
+import voiceRoutes from './routes/voice.js';
 import { validateEnv } from './env.js';
 import { initRepositories } from './repositories/index.js';
 
@@ -40,6 +41,7 @@ export function createApp(): express.Application {
   app.use('/api', refineRoutes);
   app.use('/api', shareRoutes);
   app.use('/api', vendorRoutes);
+  app.use('/api', voiceRoutes);
 
   // In production or when client is built, serve client assets
   const clientDist = path.resolve(__dirname, '../client');

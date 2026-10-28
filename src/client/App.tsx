@@ -9,6 +9,7 @@ import { DashboardShell } from './components/dashboard/DashboardShell';
 import { SharedPlanView } from './components/shared/SharedPlanView';
 import { loadGuestPlan, saveGuestPlan, clearGuestPlan } from './lib/guestPlanStorage';
 import { useAuth } from './hooks/useAuth';
+import { VoiceAgent } from './components/voice/VoiceAgent';
 
 const MainPlanner: React.FC = () => {
   const { id: routePlanId } = useParams<{ id?: string }>();
@@ -19,6 +20,7 @@ const MainPlanner: React.FC = () => {
   const [isFallback, setIsFallback] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'budget' | 'timeline' | 'vendors' | 'ideas'>('budget');
 
   // Load plan on mount or refresh:
   // For guests, loads safely from localStorage (never calls GET /api/plan/:id which would 401).
@@ -93,6 +95,7 @@ const MainPlanner: React.FC = () => {
     setCurrentPlanId(null);
     setIsFallback(false);
     setErrorMessage(null);
+    setActiveTab('budget');
     clearGuestPlan();
   };
 
@@ -118,11 +121,19 @@ const MainPlanner: React.FC = () => {
         </div>
       )}
 
+      <VoiceAgent
+        plan={currentPlan}
+        input={currentInput}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+      />
+
       {currentPlan && currentInput ? (
         <DashboardShell
           input={currentInput}
           plan={currentPlan}
           isFallback={isFallback}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           onUpdatePlan={handleUpdatePlan}
           onNewPlan={handleNewPlan}
         />

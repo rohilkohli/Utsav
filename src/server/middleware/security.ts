@@ -17,6 +17,8 @@ export const securityHeaders: RequestHandler = helmet({
         'https://identitytoolkit.googleapis.com',
         'https://securetoken.googleapis.com',
         'https://firestore.googleapis.com',
+        // Gemini Live API WebSocket (voice agent)
+        'wss://generativelanguage.googleapis.com',
       ],
       frameSrc: [
         "'self'",
