@@ -138,7 +138,7 @@ const MainPlanner: React.FC = () => {
           onNewPlan={handleNewPlan}
         />
       ) : (
-        <main>
+        <main id="main">
           <div className="container" style={{ textAlign: 'center', paddingTop: '2.5rem' }}>
             <div style={{ marginBottom: '0.75rem' }}>
               <span style={{
@@ -185,21 +185,25 @@ const MainPlanner: React.FC = () => {
             </p>
 
             {/* Feature Highlights */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem',
-              maxWidth: '900px',
-              margin: '0 auto 2.5rem',
-              textAlign: 'left',
-            }}>
+            <div
+              role="list"
+              aria-label="Key features"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem',
+                maxWidth: '900px',
+                margin: '0 auto 2.5rem',
+                textAlign: 'left',
+              }}
+            >
               {[
                 { icon: '💰', title: 'Zero Rupee Drift', desc: 'Deterministic Largest-Remainder math — budget allocations sum exactly to the paisa, never hallucinated.' },
                 { icon: '⏳', title: 'IST-Aware Timeline', desc: 'Milestones calculated in Asia/Kolkata timezone. Export RFC 5545 .ics or add directly to Google Calendar.' },
                 { icon: '🤝', title: 'Vendor Questionnaire', desc: 'AI generates 2–4 sharp interview questions per vendor. Includes Police NOC & Municipal permits for community events.' },
                 { icon: '✨', title: 'Gemini Refinement', desc: 'Rewrite any section — food, décor, activities — with a 300-char instruction. Strict event-planning focus, no off-topic drift.' },
               ].map((f) => (
-                <div key={f.title} style={{
+                <div key={f.title} role="listitem" style={{
                   background: 'var(--surface-card)',
                   border: '1px solid var(--surface-border)',
                   borderRadius: 'var(--radius-md)',
@@ -214,15 +218,18 @@ const MainPlanner: React.FC = () => {
             </div>
 
             {/* How it works */}
-            <div style={{
-              maxWidth: '700px',
-              margin: '0 auto 2.5rem',
-              background: 'var(--surface-card)',
-              border: '1px solid var(--surface-border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.5rem',
-              boxShadow: 'var(--surface-shadow)',
-            }}>
+            <section
+              aria-label="How it works"
+              style={{
+                maxWidth: '700px',
+                margin: '0 auto 2.5rem',
+                background: 'var(--surface-card)',
+                border: '1px solid var(--surface-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '1.5rem',
+                boxShadow: 'var(--surface-shadow)',
+              }}
+            >
               <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.1rem', color: 'var(--text-main)', textAlign: 'center' }}>
                 🪄 How it works — 5 steps in under 2 minutes
               </h2>
@@ -251,12 +258,42 @@ const MainPlanner: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
 
           <WizardShell onGeneratePlan={handleGeneratePlan} isGenerating={isGenerating} />
         </main>
       )}
+
+      <footer
+        aria-label="Site footer"
+        style={{
+          borderTop: '1px solid var(--surface-border)',
+          background: 'var(--surface-card)',
+          marginTop: '3rem',
+          padding: '1.5rem 1.25rem',
+          textAlign: 'center',
+          fontSize: '0.8rem',
+          color: 'var(--text-light)',
+        }}
+      >
+        <div className="container">
+          <p>
+            <strong style={{ color: 'var(--primary-saffron)' }}>Utsav (उत्सव)</strong> — India-first
+            AI Celebration &amp; Event Planner &nbsp;·&nbsp; Powered by{' '}
+            <a
+              href="https://ai.google.dev"
+              rel="noopener noreferrer"
+              target="_blank"
+              style={{ color: 'var(--primary-saffron)', textDecoration: 'none' }}
+              aria-label="Powered by Gemini AI (opens in new tab)"
+            >
+              Gemini AI
+            </a>
+            &nbsp;·&nbsp; Hack2Skill × VirtualPromptWars Challenge 5
+          </p>
+        </div>
+      </footer>
     </>
   );
 };

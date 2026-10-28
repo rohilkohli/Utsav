@@ -123,3 +123,32 @@ textarea {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* Skip-to-content link — visible only on focus */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--primary-saffron);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  z-index: 10000;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid var(--primary-gold);
+  outline-offset: 2px;
+}
+
+/* Ensure interactive elements meet 44px touch target minimum */
+button,
+[role="button"],
+[role="tab"] {
+  min-height: 44px;
+  min-width: 44px;
+}

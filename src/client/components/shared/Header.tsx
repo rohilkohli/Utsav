@@ -10,16 +10,21 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
   const { user, login, logout, isGuest } = useAuth();
 
   return (
-    <header
-      style={{
-        borderBottom: '1px solid var(--surface-border)',
-        background: 'var(--surface-card)',
-        backdropFilter: 'blur(10px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-      }}
-    >
+    <>
+      <a href="#main" className="skip-link">
+        Skip to main content
+      </a>
+      <header
+        role="banner"
+        style={{
+          borderBottom: '1px solid var(--surface-border)',
+          background: 'var(--surface-card)',
+          backdropFilter: 'blur(10px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+        }}
+      >
       <div
         className="container"
         style={{
@@ -65,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <nav aria-label="Main navigation" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {showNewPlanButton && onNewPlan && (
             <button
               onClick={onNewPlan}
@@ -141,8 +146,9 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
               </button>
             </div>
           )}
-        </div>
+        </nav>
       </div>
     </header>
+    </>
   );
 };

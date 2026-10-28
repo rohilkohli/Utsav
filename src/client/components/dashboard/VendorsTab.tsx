@@ -191,8 +191,8 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
   };
 
   const handleLinkVendor = (vendorId: string, suggestion: VendorSuggestion) => {
-    // Pre-fill vendor name field — the user can adjust status and quoted amount themselves
-    onUpdateVendor(vendorId, { name: suggestion.name });
+    // Update vendor category with the selected business name so it's visible in the checklist
+    onUpdateVendor(vendorId, { category: suggestion.name });
     setExpandedId(null);
   };
 

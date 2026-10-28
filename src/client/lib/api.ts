@@ -6,8 +6,9 @@ import type {
   GeneratePlanResponse,
   SavedPlan,
   RefineSectionResponse,
-  ShareResponse,
 } from '../../shared/schemas.js';
+
+type ShareResponse = { shareToken: string; shareUrl: string };
 
 export async function fetchRuntimeConfig(): Promise<PublicConfig> {
   const res = await fetch('/api/config');

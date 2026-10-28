@@ -272,7 +272,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
       </div>
 
       {/* Active Tab Content */}
-      <main>
+      <main id="main">
         {activeTab === 'budget' && (
           <BudgetTab
             categories={plan.budget}
