@@ -25,4 +25,38 @@ describe('Currency Utility - Indian Rupee (₹)', () => {
     expect(parseINR('')).toBe(0);
     expect(parseINR('abc')).toBe(0);
   });
+
+  it('formats small amounts correctly', () => {
+    const result = formatINR(1000).replace(/ /g, ' ');
+    expect(result).toMatch(/₹\s?1,000/);
+  });
+
+  it('formats negative numbers as absolute value', () => {
+    const result = formatINR(-50000).replace(/ /g, ' ');
+    expect(result).toMatch(/₹/);
+    expect(result).not.toContain('NaN');
+  });
+
+  it('rounds fractional rupees to nearest integer', () => {
+    const r1 = formatINR(1000.6).replace(/ /g, ' ');
+    const r2 = formatINR(1000.4).replace(/ /g, ' ');
+    expect(r1).toMatch(/1,001/);
+    expect(r2).toMatch(/1,000/);
+  });
+
+  it('parses plain integer string without symbol', () => {
+    expect(parseINR('500000')).toBe(500000);
+  });
+
+  it('parses string with only non-numeric characters', () => {
+    expect(parseINR('₹₹₹')).toBe(0);
+  });
+
+  it('parses whitespace-only string', () => {
+    expect(parseINR('   ')).toBe(0);
+  });
+
+  it('handles -Infinity gracefully', () => {
+    expect(formatINR(-Infinity)).toBe('₹0');
+  });
 });

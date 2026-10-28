@@ -101,6 +101,46 @@ describe('Budget Math - Deterministic Allocation', () => {
     expect(sum).toBe(80_000);
   });
 
+  it('allocates single item — full budget goes to it', () => {
+    const amounts = allocateAmountsByLargestRemainder([{ suggestedPercent: 100 }], 75_000);
+    expect(amounts).toEqual([75_000]);
+  });
+
+  it('allocates zero percent items as zero', () => {
+    const items = [{ suggestedPercent: 0 }, { suggestedPercent: 0 }];
+    const amounts = allocateAmountsByLargestRemainder(items, 100_000);
+    const sum = amounts.reduce((a, b) => a + b, 0);
+    expect(sum).toBe(100_000);
+  });
+
+  it('handles 10-category wedding budget summing exactly to budget', () => {
+    const items = Array.from({ length: 10 }, (_, i) => ({ suggestedPercent: 10 }));
+    const budget = 357_891;
+    const amounts = allocateAmountsByLargestRemainder(items, budget);
+    const sum = amounts.reduce((a, b) => a + b, 0);
+    expect(sum).toBe(budget);
+    amounts.forEach((a) => expect(Number.isInteger(a)).toBe(true));
+  });
+
+  it('applyBudgetCut preserves integer amounts after cut', () => {
+    const categories = [
+      { id: '1', category: 'Venue', suggestedPercent: 60, amount: 60_000, actual: 60_000 },
+      { id: '2', category: 'Catering', suggestedPercent: 40, amount: 40_000, actual: 40_000 },
+    ];
+    const { updatedCategories } = applyBudgetCut(categories, 100_000, 15);
+    updatedCategories.forEach((c) => expect(Number.isInteger(c.amount)).toBe(true));
+  });
+
+  it('calculateBudgetTotals with zero actuals reports zero actual and under-budget', () => {
+    const cats = [
+      { id: '1', category: 'X', suggestedPercent: 100, amount: 50_000, actual: 0 },
+    ];
+    const totals = calculateBudgetTotals(cats, 50_000);
+    expect(totals.totalActual).toBe(0);
+    expect(totals.isOverBudget).toBe(false);
+    expect(totals.underBudgetAmount).toBe(50_000);
+  });
+
   it('groups categories correctly by subEvent', () => {
     const categories = [
       {
