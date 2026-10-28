@@ -295,8 +295,27 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ plan, input, onNavigateT
       src.connect(analyser);
       volRafRef.current = requestAnimationFrame(pollVolume);
 
-      // AudioWorkletNode for mic capture (replaces deprecated ScriptProcessorNode)
-      await micCtx.audioWorklet.addModule('/pcm-processor.js');
+      // AudioWorkletNode for mic capture (replaces deprecated ScriptProcessorNode).
+      // Inlined as a Blob URL so it works regardless of static-file hosting / MIME config.
+      const workletSrc = `
+        class PCMProcessor extends AudioWorkletProcessor {
+          constructor() { super(); this._buf = new Float32Array(1024); this._pos = 0; }
+          process(inputs) {
+            const ch = inputs[0]?.[0];
+            if (!ch) return true;
+            for (let i = 0; i < ch.length; i++) {
+              this._buf[this._pos++] = ch[i];
+              if (this._pos === 1024) { this.port.postMessage(this._buf.slice()); this._pos = 0; }
+            }
+            return true;
+          }
+        }
+        registerProcessor('pcm-processor', PCMProcessor);
+      `;
+      const blob = new Blob([workletSrc], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      await micCtx.audioWorklet.addModule(workletUrl);
+      URL.revokeObjectURL(workletUrl);
       const workletNode = new AudioWorkletNode(micCtx, 'pcm-processor');
       processorRef.current = workletNode;
       src.connect(workletNode);
