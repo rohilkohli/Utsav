@@ -73,7 +73,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ plan, input, onNavigateT
   const micCtxRef = useRef<AudioContext | null>(null);
   const playCtxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<AudioWorkletNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceListRef = useRef<AudioBufferSourceNode[]>([]);
   const nextPlayRef = useRef(0);
@@ -295,14 +295,15 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ plan, input, onNavigateT
       src.connect(analyser);
       volRafRef.current = requestAnimationFrame(pollVolume);
 
-      // ScriptProcessor to capture and send mic audio
-      const processor = micCtx.createScriptProcessor(1024, 1, 1);
-      processorRef.current = processor;
-      analyser.connect(processor);
-      processor.connect(micCtx.destination);
-      processor.onaudioprocess = (e) => {
+      // AudioWorkletNode for mic capture (replaces deprecated ScriptProcessorNode)
+      await micCtx.audioWorklet.addModule('/pcm-processor.js');
+      const workletNode = new AudioWorkletNode(micCtx, 'pcm-processor');
+      processorRef.current = workletNode;
+      src.connect(workletNode);
+      workletNode.connect(micCtx.destination);
+      workletNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-        const pcm = float32ToPcm16Base64(e.inputBuffer.getChannelData(0));
+        const pcm = float32ToPcm16Base64(e.data);
         wsRef.current.send(JSON.stringify({
           realtimeInput: { audio: { mimeType: 'audio/pcm;rate=16000', data: pcm } },
         }));
