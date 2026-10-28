@@ -51,7 +51,7 @@ const MainPlanner: React.FC = () => {
           });
       });
     }
-  }, [user, routePlanId]);
+  }, [user, routePlanId, currentPlan]);
 
   const handleGeneratePlan = async (input: WizardInput) => {
     setIsGenerating(true);

@@ -2,9 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import admin from 'firebase-admin';
 import {
   initRepositories,
-  getPlanRepository,
-  getShareRepository,
-  setRepositories,
   getActiveStoreType,
   InMemoryRepository,
   FirestoreRepository,
@@ -160,11 +157,11 @@ describe('Repository Pattern & Storage Backends', () => {
 
       const mockCollectionSet = vi.fn().mockResolvedValue(undefined);
       const mockDocGet = vi.fn();
-      const mockDoc = vi.fn((docId: string) => ({
+      const mockDoc = vi.fn((_docId: string) => ({
         set: mockCollectionSet,
         get: mockDocGet,
       }));
-      const mockCollection = vi.fn((name: string) => ({
+      const mockCollection = vi.fn((_name: string) => ({
         doc: mockDoc,
       }));
 

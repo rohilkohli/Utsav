@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { logger } from '../lib/logger.js';
 import { nanoid } from 'nanoid';
 import {
   type WizardInput,
@@ -434,15 +435,13 @@ export async function generateEventPlan(
   const cacheKey = createPlanCacheKey(input as unknown as Record<string, unknown>);
   const cached = getCachedPlan(cacheKey);
   if (cached) {
-    console.info(
-      `[Plan Generation] Source: cache (Event: ${input.eventType}, City: ${input.city})`,
-    );
+    logger.info(`[Plan Generation] Source: cache (Event: ${input.eventType}, City: ${input.city})`);
     return { plan: cached, source: 'cache' };
   }
 
   // If no API key configured (e.g. initial dev or test), return fallback
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    console.info('[Plan Generation] Source: fallback (GEMINI_API_KEY not configured)');
+    logger.info('[Plan Generation] Source: fallback (GEMINI_API_KEY not configured)');
     const fallback = generateFallbackPlan(input);
     return { plan: fallback, source: 'fallback' };
   }
@@ -479,9 +478,7 @@ export async function generateEventPlan(
       const enriched = enrichRawPlan(validated, input);
       setCachedPlan(cacheKey, enriched);
 
-      console.info(
-        `[Plan Generation] Source: gemini (Model: ${modelName}, Event: ${input.eventType})`,
-      );
+      logger.info(`[Plan Generation] Source: gemini (Model: ${modelName}, Event: ${input.eventType})`);
       return { plan: enriched, source: 'gemini' };
     } catch (err) {
       _lastError = err instanceof Error ? err : new Error(String(err));
@@ -489,9 +486,7 @@ export async function generateEventPlan(
   }
 
   // If both attempts failed, return graceful fallback plan
-  console.warn(
-    `[Plan Generation] Source: fallback (Gemini error: ${_lastError?.message || 'unknown'})`,
-  );
+  logger.warn(`[Plan Generation] Source: fallback (Gemini error: ${_lastError?.message || 'unknown'})`);
   const fallback = generateFallbackPlan(input);
   return { plan: fallback, source: 'fallback' };
 }
@@ -507,7 +502,7 @@ export async function refineIdeasSection(
   currentIdeas: Idea[],
 ): Promise<{ ideas: Idea[]; source: 'gemini' | 'fallback' }> {
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    console.info('[Refine Section] Source: fallback (GEMINI_API_KEY not configured)');
+    logger.info('[Refine Section] Source: fallback (GEMINI_API_KEY not configured)');
     return { ideas: currentIdeas, source: 'fallback' };
   }
 
@@ -546,13 +541,13 @@ export async function refineIdeasSection(
         subEvent: raw.subEvent,
       }));
 
-      console.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
+      logger.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
       return { ideas, source: 'gemini' };
     } catch {
       // Continue loop for retry
     }
   }
 
-  console.warn(`[Refine Section] Source: fallback (Gemini API failed for section ${section})`);
+  logger.warn(`[Refine Section] Source: fallback (Gemini API failed for section ${section})`);
   return { ideas: currentIdeas, source: 'fallback' };
 }
