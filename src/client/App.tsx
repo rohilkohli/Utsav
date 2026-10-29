@@ -20,7 +20,7 @@ const MainPlanner: React.FC = () => {
   const [isFallback, setIsFallback] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'budget' | 'timeline' | 'vendors' | 'ideas'>('budget');
+  const [activeTab, setActiveTab] = useState<'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet'>('budget');
 
   // Load plan on mount or refresh:
   // For guests, loads safely from localStorage (never calls GET /api/plan/:id which would 401).

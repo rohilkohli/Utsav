@@ -114,7 +114,7 @@ describe('Budget Math - Deterministic Allocation', () => {
   });
 
   it('handles 10-category wedding budget summing exactly to budget', () => {
-    const items = Array.from({ length: 10 }, (_, i) => ({ suggestedPercent: 10 }));
+    const items = Array.from({ length: 10 }, () => ({ suggestedPercent: 10 }));
     const budget = 357_891;
     const amounts = allocateAmountsByLargestRemainder(items, budget);
     const sum = amounts.reduce((a, b) => a + b, 0);

@@ -491,6 +491,87 @@ export async function generateEventPlan(
   return { plan: fallback, source: 'fallback' };
 }
 
+export interface PlanReview {
+  strengths: string[];
+  risks: string[];
+  suggestions: string[];
+  overallScore: number; // 1-10
+}
+
+/**
+ * AI-powered plan review: returns strengths, risks, and actionable suggestions.
+ * Falls back to a heuristic review when Gemini is unavailable.
+ */
+export async function reviewPlan(
+  plan: PlanOutput,
+  input: WizardInput,
+): Promise<{ review: PlanReview; source: 'gemini' | 'fallback' }> {
+  const heuristicReview = (): PlanReview => {
+    const overBudget = plan.budget.reduce((s, c) => s + c.actual, 0) > input.totalBudget;
+    const unbookedVendors = plan.vendors.filter((v) => v.status === 'to-contact').length;
+    const completedMilestones = plan.timeline.filter((m) => m.completed).length;
+    return {
+      strengths: [
+        `${plan.vendors.length} vendor categories identified`,
+        `${plan.timeline.length} timeline milestones planned`,
+        completedMilestones > 0 ? `${completedMilestones} milestones already completed` : 'Plan ready to execute',
+      ],
+      risks: [
+        overBudget ? 'Actual spend exceeds total budget — review categories' : 'Budget allocation looks healthy',
+        unbookedVendors > 3 ? `${unbookedVendors} vendors still uncontacted — start booking early` : 'Vendor booking on track',
+      ],
+      suggestions: [
+        'Get 2-3 competing quotes per vendor category to ensure best value',
+        'Mark milestones as complete as you progress to stay on track',
+        'Share the plan link with family coordinators for visibility',
+      ],
+      overallScore: overBudget ? 6 : unbookedVendors > plan.vendors.length / 2 ? 7 : 8,
+    };
+  };
+
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return { review: heuristicReview(), source: 'fallback' };
+  }
+
+  const prompt = `You are Utsav, an expert Indian event planner. Review this celebration plan and give honest feedback.
+
+EVENT: ${input.eventType} in ${input.city} for ${input.guestCount} guests on ${input.eventDate}
+BUDGET: ₹${input.totalBudget.toLocaleString('en-IN')}
+PLAN SUMMARY: ${plan.summary}
+BUDGET CATEGORIES: ${plan.budget.map((b) => `${b.category} (₹${b.amount.toLocaleString('en-IN')})`).join(', ')}
+VENDOR COUNT: ${plan.vendors.length} categories
+MILESTONE COUNT: ${plan.timeline.length}
+
+Respond with JSON: { "strengths": [3 strings], "risks": [2-3 strings], "suggestions": [3 actionable strings], "overallScore": number 1-10 }`;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (attempt > 0) await sleep(1000);
+      const generateCall = ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          temperature: 0.5,
+        },
+      });
+      const response = await withTimeout(generateCall, 20000);
+      const text = response.text || '';
+      const parsed = sanitizeObject(JSON.parse(text)) as PlanReview;
+      if (Array.isArray(parsed.strengths) && Array.isArray(parsed.risks) && Array.isArray(parsed.suggestions)) {
+        logger.info(`[Review Plan] Source: gemini`);
+        return { review: parsed, source: 'gemini' };
+      }
+    } catch {
+      // retry
+    }
+  }
+
+  logger.warn('[Review Plan] Source: fallback (Gemini API failed)');
+  return { review: heuristicReview(), source: 'fallback' };
+}
+
 /**
  * Refine ideas for a specific section via Gemini with retry and fallback.
  * Returns refined ideas and meta source ('gemini' | 'fallback').

@@ -5,6 +5,8 @@ import { expect } from 'vitest';
 expect.extend(matchers);
 
 // Mock HTMLCanvasElement.getContext for jsdom and axe-core color-contrast checking
+// Guard: HTMLCanvasElement is only available in jsdom environments
+if (typeof HTMLCanvasElement !== 'undefined') {
 HTMLCanvasElement.prototype.getContext = (() => {
   return {
     fillRect: () => {},
@@ -33,3 +35,4 @@ HTMLCanvasElement.prototype.getContext = (() => {
     clip: () => {},
   } as unknown as RenderingContext;
 }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+}

@@ -4,20 +4,23 @@ import { BudgetTab } from './BudgetTab';
 import { TimelineTab } from './TimelineTab';
 import { VendorsTab } from './VendorsTab';
 import { IdeasTab } from './IdeasTab';
+import { RunSheetTab } from './RunSheetTab';
 import { ShareModal } from '../shared/ShareModal';
 import { useAuth } from '../../hooks/useAuth.js';
+import { calculateBudgetTotals } from '@shared/budget';
+import { suggestTradeoffs } from '@shared/tradeoffs';
 
 interface DashboardShellProps {
   input: WizardInput;
   plan: PlanOutput;
   isFallback?: boolean;
-  activeTab?: 'budget' | 'timeline' | 'vendors' | 'ideas';
-  onTabChange?: (tab: 'budget' | 'timeline' | 'vendors' | 'ideas') => void;
+  activeTab?: TabType;
+  onTabChange?: (tab: TabType) => void;
   onUpdatePlan: (updated: PlanOutput, newBudget?: number) => void;
   onNewPlan: () => void;
 }
 
-type TabType = 'budget' | 'timeline' | 'vendors' | 'ideas';
+type TabType = 'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet';
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({
   input,
@@ -52,11 +55,17 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
     onUpdatePlan({ ...plan, ideas });
   };
 
+  const budgetTotals = calculateBudgetTotals(plan.budget, input.totalBudget);
+  const tradeoffs = budgetTotals.isOverBudget
+    ? suggestTradeoffs(plan.budget, input.totalBudget, budgetTotals.overBudgetAmount)
+    : [];
+
   const tabs: Array<{ id: TabType; label: string; icon: string }> = [
     { id: 'budget', label: 'Budget Planner', icon: '💰' },
     { id: 'timeline', label: 'Timeline & Milestones', icon: '⏳' },
     { id: 'vendors', label: 'Vendor Checklist', icon: '🤝' },
     { id: 'ideas', label: 'Personalized Ideas', icon: '✨' },
+    { id: 'runsheet', label: 'Day-of Run Sheet', icon: '📋' },
   ];
 
   return (
@@ -106,6 +115,52 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           </button>
         </div>
       )}
+      {/* Over-budget tradeoff alert */}
+      {tradeoffs.length > 0 && (
+        <div
+          role="alert"
+          aria-label="Budget tradeoff suggestions"
+          style={{
+            background: 'rgba(194, 24, 91, 0.06)',
+            border: '1px solid var(--primary-magenta)',
+            color: 'var(--text-main)',
+            padding: '1rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <strong style={{ fontSize: '0.95rem' }}>
+              You are ₹{budgetTotals.overBudgetAmount.toLocaleString('en-IN')} over budget. Here are 3 ways to fix it:
+            </strong>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+            {tradeoffs.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onUpdatePlan({ ...plan, budget: opt.updatedCategories }, opt.newTotal)}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--primary-magenta)',
+                  background: 'transparent',
+                  color: 'var(--primary-magenta)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                title={opt.description}
+              >
+                {opt.label} (saves ₹{opt.savings.toLocaleString('en-IN')})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Fallback notification if Gemini hit quota / network issues */}
       {isFallback && (
         <div
@@ -301,6 +356,9 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
             currentPlan={plan}
             onUpdateIdeas={handleUpdateIdeas}
           />
+        )}
+        {activeTab === 'runsheet' && (
+          <RunSheetTab eventType={input.eventType} eventDate={input.eventDate} />
         )}
       </main>
 

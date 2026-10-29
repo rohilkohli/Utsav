@@ -6,6 +6,7 @@ import { securityHeaders } from './middleware/security.js';
 import configRoutes from './routes/config.js';
 import planRoutes from './routes/plan.js';
 import refineRoutes from './routes/refine.js';
+import reviewRoutes from './routes/review.js';
 import shareRoutes from './routes/share.js';
 import vendorRoutes from './routes/vendors.js';
 import voiceRoutes from './routes/voice.js';
@@ -39,6 +40,7 @@ export function createApp(): express.Application {
   app.use('/api', configRoutes);
   app.use('/api', planRoutes);
   app.use('/api', refineRoutes);
+  app.use('/api', reviewRoutes);
   app.use('/api', shareRoutes);
   app.use('/api', vendorRoutes);
   app.use('/api', voiceRoutes);
