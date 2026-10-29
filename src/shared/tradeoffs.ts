@@ -1,31 +1,64 @@
 import type { BudgetCategory } from './schemas.js';
 import { populateCategoryAmounts } from './budget.js';
 
+/**
+ * Represents a single concrete budget tradeoff option shown to the user
+ * when their actual spend exceeds the total budget.
+ */
 export interface TradeoffOption {
+  /** Stable identifier for the option (e.g. 'uniform-cut', 'flex-cut', 'rebalance') */
   id: string;
+  /** Short human-readable label for the action button */
   label: string;
+  /** Longer explanation of what this option does and what stays unchanged */
   description: string;
+  /** New total budget after applying this option */
   newTotal: number;
+  /** Amount saved compared to current actual spend */
   savings: number;
+  /** Updated BudgetCategory array with recalculated amounts */
   updatedCategories: BudgetCategory[];
 }
 
+/** Category names that are discretionary and can be cut first */
 const HIGH_FLEX_CATEGORIES = ['decor', 'decoration', 'entertainment', 'photography', 'videography', 'stationery', 'return gifts', 'return gift', 'gifts'];
+/** Category names that are essential and should be protected from cuts */
 const LOW_FLEX_CATEGORIES = ['catering', 'food', 'venue', 'hall', 'priest', 'pandit', 'accommodation'];
 
+/**
+ * Returns true if the category is discretionary (can be reduced without major impact).
+ * @param category - The category name from the budget plan
+ */
 function isHighFlex(category: string): boolean {
   const lower = category.toLowerCase();
   return HIGH_FLEX_CATEGORIES.some((k) => lower.includes(k));
 }
 
+/**
+ * Returns true if the category is essential (catering, venue, priest, etc.) and
+ * should not be cut in flex-first scenarios.
+ * @param category - The category name from the budget plan
+ */
 function isLowFlex(category: string): boolean {
   const lower = category.toLowerCase();
   return LOW_FLEX_CATEGORIES.some((k) => lower.includes(k));
 }
 
 /**
- * Generates 3 concrete tradeoff options when the plan is over budget.
- * Pure function — no LLM involved.
+ * Generates 3 concrete, actionable tradeoff options when the plan is over budget.
+ *
+ * Option 1 — Uniform cut: scales every category proportionally.
+ * Option 2 — Flex-first cut: reduces discretionary categories (décor, photography,
+ *             return gifts) while protecting essentials (catering, venue, pandit).
+ * Option 3 — Rebalance: brings overspent non-essential categories back to plan,
+ *             or falls back to a 15% deep-cut if no under-spent categories exist.
+ *
+ * Pure function — no LLM calls, deterministic output.
+ *
+ * @param categories - Current budget categories with actual spend values
+ * @param totalBudget - The user's declared total budget
+ * @param overByAmount - How much actual spend exceeds totalBudget (must be > 0)
+ * @returns Array of exactly 3 TradeoffOption objects, or empty array if not over budget
  */
 export function suggestTradeoffs(
   categories: BudgetCategory[],

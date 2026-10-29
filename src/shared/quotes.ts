@@ -1,5 +1,11 @@
+/**
+ * Vendor quote analysis utilities.
+ * Provides schema validation for vendor quotes and pure comparison logic
+ * to evaluate quotes against budgeted amounts without any LLM calls.
+ */
 import { z } from 'zod';
 
+/** Zod schema for validating an incoming vendor quote */
 export const vendorQuoteSchema = z.object({
   id: z.string(),
   vendorId: z.string(),
@@ -13,18 +19,33 @@ export const vendorQuoteSchema = z.object({
 
 export type VendorQuote = z.infer<typeof vendorQuoteSchema>;
 
+/**
+ * Classification of how a vendor's quoted amount compares to the budgeted amount:
+ * - `within-budget`: quote <= budgeted
+ * - `slightly-over`: 1-10% over budget (negotiate a small discount)
+ * - `over-budget`: 11-25% over budget (compare alternatives)
+ * - `significantly-over`: >25% over budget (strongly reconsider vendor)
+ */
 export type QuoteVerdict = 'within-budget' | 'slightly-over' | 'over-budget' | 'significantly-over';
 
+/** Result of comparing a vendor quote against the category budget */
 export interface QuoteComparison {
+  /** Severity classification of the quote vs budget */
   verdict: QuoteVerdict;
+  /** Absolute difference in rupees (positive = over budget, negative = under) */
   delta: number;
+  /** Percentage difference relative to budgetedAmount (0 when budgetedAmount is 0) */
   deltaPercent: number;
+  /** Human-readable recommendation with vendor name and actionable advice */
   recommendation: string;
 }
 
 /**
- * Compares a vendor quote against the budgeted amount for the category.
- * Pure function — no LLM.
+ * Compares a vendor quote against the budgeted amount for that category.
+ * Produces a verdict and actionable recommendation without any LLM call.
+ *
+ * @param quote - The vendor quote to evaluate (must pass vendorQuoteSchema validation)
+ * @returns QuoteComparison with verdict, delta, deltaPercent, and recommendation string
  */
 export function compareQuote(quote: VendorQuote): QuoteComparison {
   const { quotedAmount, budgetedAmount, vendorName, category } = quote;

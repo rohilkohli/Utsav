@@ -1,3 +1,14 @@
+/**
+ * POST /api/review-plan
+ *
+ * AI-powered plan review endpoint. Accepts a full celebration plan and wizard input,
+ * then returns structured feedback from Gemini — strengths, risks, and actionable
+ * suggestions — with a heuristic fallback when the API is unavailable.
+ *
+ * Rate-limited by generationLimiter (shared with /api/plan and /api/refine).
+ * Request body: { plan: PlanOutput, input: WizardInput }
+ * Response: { review: PlanReview, meta: { source: 'gemini' | 'fallback' } }
+ */
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { planOutputSchema, wizardInputSchema } from '../../shared/schemas.js';

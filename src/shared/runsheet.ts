@@ -1,14 +1,27 @@
+/**
+ * Day-of run sheet data for each supported event type.
+ * Provides time-blocked task lists that coordinators and vendors can follow
+ * on the day of the celebration — no LLM required.
+ */
 import type { EventType } from './schemas.js';
 
+/** A single time-block entry in a day-of run sheet */
 export interface RunSheetBlock {
+  /** Wall-clock time or relative offset (e.g. "6:00 AM", "T-3 days", "+2 hr") */
   time: string;
+  /** Description of the task to be completed */
   task: string;
+  /** Person or vendor role responsible for this task */
   owner: string;
+  /** Optional coordinator tip or reminder */
   notes?: string;
 }
 
+/** Complete day-of run sheet for a specific event type */
 export interface RunSheet {
+  /** Human-readable event label (e.g. "Wedding Day", "Birthday Celebration") */
   eventLabel: string;
+  /** Ordered list of time-block tasks */
   blocks: RunSheetBlock[];
 }
 
@@ -70,6 +83,11 @@ export const RUN_SHEETS: Record<EventType, RunSheet> = {
   community: { eventLabel: 'Community Festival', blocks: COMMUNITY_RUN_SHEET },
 };
 
+/**
+ * Returns the day-of run sheet for the given event type.
+ * @param eventType - One of 'wedding' | 'birthday' | 'community'
+ * @returns RunSheet with ordered time-block tasks and owner assignments
+ */
 export function getRunSheet(eventType: EventType): RunSheet {
   return RUN_SHEETS[eventType];
 }

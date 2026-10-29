@@ -29,7 +29,17 @@ export const BUDGET_PRESETS: Record<EventType, BudgetPreset[]> = {
 /**
  * Largest-Remainder Method (Hare-Niemeyer method).
  * Distributes totalBudget across categories using percentages such that
- * the sum of rounded integer amounts equals EXACTLY totalBudget.
+ * the sum of rounded integer amounts equals EXACTLY totalBudget (no penny drift).
+ *
+ * Algorithm:
+ * 1. Compute exact rupee share for each category (percent × total).
+ * 2. Floor all shares to integers and track remainders.
+ * 3. Sort by remainder descending; award 1 extra rupee to top-N categories
+ *    until the total discrepancy is resolved.
+ *
+ * @param items - Array of objects with a `suggestedPercent` field
+ * @param totalBudget - Total rupee amount to distribute (must be >= 0)
+ * @returns Array of integer rupee amounts in the same order as `items`
  */
 export function allocateAmountsByLargestRemainder(
   items: { suggestedPercent: number }[],
@@ -68,7 +78,13 @@ export function allocateAmountsByLargestRemainder(
 }
 
 /**
- * Normalizes raw categories and calculates deterministic amounts using largest-remainder rounding.
+ * Normalizes raw categories (re-scaling percentages to sum to 100%) and
+ * calculates deterministic integer rupee amounts via the Largest-Remainder method.
+ * If all percentages are zero, allocates the budget evenly across all categories.
+ *
+ * @param categories - Array of category objects with id, category name, suggestedPercent, and optional actual/subEvent
+ * @param totalBudget - Total rupee budget to distribute
+ * @returns Fully populated BudgetCategory array with normalized percents and exact rupee amounts
  */
 export function populateCategoryAmounts(
   categories: Array<{
@@ -111,7 +127,12 @@ export interface BudgetTotals {
 }
 
 /**
- * Pure calculation of budget totals. Zero LLM involvement.
+ * Computes aggregated budget totals from a set of BudgetCategory entries.
+ * Pure calculation — no LLM, no side-effects.
+ *
+ * @param categories - Array of BudgetCategory with `amount` (planned) and `actual` (spent) fields
+ * @param totalBudget - The user's declared total budget
+ * @returns BudgetTotals with totalBudgeted, totalActual, difference, isOverBudget, and over/under amounts
  */
 export function calculateBudgetTotals(
   categories: BudgetCategory[],
@@ -133,8 +154,13 @@ export function calculateBudgetTotals(
 }
 
 /**
- * Deterministic "Cut budget X%" calculation.
- * Cuts totalBudget by the given percentage and re-allocates all rows.
+ * Deterministically reduces the total budget by a given percentage and
+ * re-allocates all category amounts using the Largest-Remainder method.
+ *
+ * @param categories - Current BudgetCategory array
+ * @param currentTotal - Current total budget in rupees
+ * @param percentCut - Percentage to cut (0-100); clamped to 0 minimum
+ * @returns Object with `newTotal` (integer rupees) and `updatedCategories` (re-allocated)
  */
 export function applyBudgetCut(
   categories: BudgetCategory[],
@@ -148,7 +174,12 @@ export function applyBudgetCut(
 }
 
 /**
- * Group categories by subEvent (e.g., Haldi, Mehendi, General)
+ * Groups BudgetCategory entries by their `subEvent` field.
+ * Categories with no subEvent are placed under the key `'General'`.
+ * Used by the dashboard to render per-ceremony budget breakdowns.
+ *
+ * @param categories - Array of BudgetCategory entries
+ * @returns Record mapping subEvent name → array of BudgetCategory items
  */
 export function groupCategoriesBySubEvent(
   categories: BudgetCategory[],
