@@ -16,13 +16,17 @@ export default defineConfig({
     ],
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
     setupFiles: ['src/client/__tests__/setup.ts'],
-    pool: 'threads',
+    // 'forks' pool with singleFork avoids jsdom Worker-thread memory leaks in CI.
+    // Threads share one heap and the jsdom environment accumulates until OOM after ~5h.
+    // A single forked process runs tests sequentially in its own address space.
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 2,
+      forks: {
+        singleFork: true,
       },
     },
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: 'v8',
       include: ['src/shared/**/*.ts', 'src/server/**/*.ts'],

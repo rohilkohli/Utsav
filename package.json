@@ -13,8 +13,8 @@
     "build:server": "tsup src/server/index.ts --format esm --out-dir dist/server --clean --target node22",
     "start": "node dist/server/index.js",
     "lint": "eslint src/ --max-warnings 0",
-    "test": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vitest run",
-    "test:coverage": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vitest run --coverage",
+    "test": "cross-env NODE_OPTIONS=--max-old-space-size=2048 vitest run",
+    "test:coverage": "cross-env NODE_OPTIONS=--max-old-space-size=2048 vitest run --coverage",
     "test:e2e": "playwright test",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""

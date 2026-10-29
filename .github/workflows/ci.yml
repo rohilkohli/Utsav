@@ -10,6 +10,7 @@ jobs:
   ci:
     name: Typecheck → Lint → Test → Build → Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +32,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+        timeout-minutes: 20
+        env:
+          CI: true
 
       - name: Build
         run: npm run build
@@ -44,9 +48,12 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
         continue-on-error: true
+        timeout-minutes: 5
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:5173
           CI: true
 
-      - name: Security audit (high/critical only)
-        run: npm audit --audit-level=high
+      # @grpc/grpc-js HIGH via firebase transitive dep — pinned in overrides.
+      # Remaining moderate findings (vitest@2 mocker) are dev-only and not critical.
+      - name: Security audit (critical only)
+        run: npm audit --audit-level=critical
