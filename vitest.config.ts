@@ -10,9 +10,19 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'node',
+    environmentMatchGlobs: [
+      ['src/client/**', 'jsdom'],
+    ],
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
     setupFiles: ['src/client/__tests__/setup.ts'],
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        minThreads: 1,
+        maxThreads: 2,
+      },
+    },
     coverage: {
       provider: 'v8',
       include: ['src/shared/**/*.ts', 'src/server/**/*.ts'],
