@@ -32,7 +32,23 @@ Utsav is an India-first AI celebration and event planner engineered to solve the
    - Section rewrite chat with a strict 300-character limit and specialized system prompt keeping AI strictly focused on event planning.
    - `aria-live` accessible announcements for screen readers.
 
-5. **🔗 Read-Only Sharing & WhatsApp Integration**
+5. **📋 Day-of Run Sheet**
+   - Detailed time-blocked task list for Wedding, Birthday, and Community events.
+   - Owner-tagged blocks (Decorator, Caterer, Host, Groom-side, etc.) for clear coordination.
+   - Static, zero-latency data — no AI call required on the day of the event.
+
+6. **⚖️ Budget Tradeoff Engine**
+   - When over budget, generates **3 actionable tradeoff options** instantly: uniform cut across all categories, flex-cut (reduce Décor & Photography first), and smart rebalance (redistribute from under-spent categories).
+   - Each option shows exact rupee impact so the planner can choose without guessing.
+
+7. **📊 Vendor Quote Comparison**
+   - `compareQuote` classifies any vendor quote as `within-budget` / `slightly-over` / `over-budget` / `significantly-over` with delta percentage and a plain-English recommendation.
+
+8. **🤖 AI Plan Review (`/api/review-plan`)**
+   - New endpoint that reviews a saved plan and returns structured strengths, risks, and suggestions.
+   - Falls back to heuristic review when Gemini is unavailable (unbooked vendor count, over-budget check, milestone progress).
+
+9. **🔗 Read-Only Sharing & WhatsApp Integration**
    - Generates read-only snapshot links protected by cryptographically secure 128-bit random tokens with 30-day automatic expiration.
    - Pre-filled **WhatsApp share** format with emojis and key event metrics.
    - Full **Guest Mode** functionality with optional Google Sign-in.
@@ -96,30 +112,36 @@ graph TB
 
 ## 🧪 Testing Summary & Code Coverage
 
-Tests are executed via **Vitest** with `@vitest/coverage-v8`, `@testing-library/react`, and `vitest-axe`.
+Tests are executed via **Vitest** with `@vitest/coverage-v8`, `@testing-library/react`, and `vitest-axe`. End-to-end tests use **Playwright** on Chromium.
 
-### Test Suites (53 Tests Total, 100% Passing):
+### Test Suites (160+ Tests, 100% Passing):
 1. **Budget Math**: Deterministic Largest-Remainder allocation, zero/huge budget handling (up to ₹100 Crore), budget cuts (-10%, -20%, -30%), totals calculation.
-2. **Timeline & IST Dates**: UTC calendar day math, countdown calculations, and the **00:30 IST boundary case** (19:00 UTC previous day).
-3. **Currency**: `Intl.NumberFormat('en-IN')` verification with Indian digit grouping and string parsing.
-4. **Calendar Export**: RFC 5545 `.ics` formatting with CRLF line terminators, escaped characters, and valid Google Calendar template links.
-5. **Zod Schemas**: Strict input validation, date-only formats, guest count boundaries (0 to 10,000), 300-char refine instruction limits, and `z.toJSONSchema` schema properties / required keys.
-6. **Gemini & Fallback**: Prompt engineering verification (ceremonies and municipal clearances), schema generation, and fallback plan completeness.
-7. **Server API Integration**: Full integration testing of `/api/health`, runtime Firebase `/api/config`, `/api/plan`, `/api/refine` with `meta.source` logging, `/api/share` with 30-day Firestore Timestamp expiration, and 11-request rate limiter throttling (`generationLimiter`).
-8. **Server Env Validation**: Fail-fast startup validation verifying presence of `GEMINI_API_KEY`, `GEMINI_MODEL`, and all `FIREBASE_*` variables.
-9. **Accessibility (`vitest-axe`)**: Automated Axe accessibility validation on Wizard and every dashboard tab (Budget, Timeline, Vendors, Ideas) with **zero violations**.
+2. **Budget Tradeoffs**: `suggestTradeoffs` engine — 3-option tradeoff generation (uniform-cut, flex-cut, rebalance), over-budget detection, verified with mixed over/under-spent category sets.
+3. **Vendor Quote Analysis**: `compareQuote` verdict classification (within-budget / slightly-over / over-budget / significantly-over), deltaPercent math, recommendation strings.
+4. **Timeline & IST Dates**: UTC calendar day math, countdown calculations, and the **00:30 IST boundary case** (19:00 UTC previous day).
+5. **Currency**: `Intl.NumberFormat('en-IN')` verification with Indian digit grouping and string parsing.
+6. **Calendar Export**: RFC 5545 `.ics` formatting with CRLF line terminators, escaped characters, and valid Google Calendar template links.
+7. **Zod Schemas**: Strict input validation, date-only formats, guest count boundaries (0 to 10,000), 300-char refine instruction limits, and `z.toJSONSchema` schema properties / required keys.
+8. **Gemini & Fallback**: Prompt engineering verification (ceremonies and municipal clearances), schema generation, and fallback plan completeness.
+9. **Server API Integration**: Full integration testing of `/api/health`, runtime Firebase `/api/config`, `/api/plan`, `/api/refine`, `/api/review-plan` with `meta.source` logging, `/api/share` with 30-day Firestore Timestamp expiration, and 11-request rate limiter throttling (`generationLimiter`).
+10. **Server Env Validation**: Fail-fast startup validation verifying presence of `GEMINI_API_KEY`, `GEMINI_MODEL`, and all `FIREBASE_*` variables.
+11. **Hygiene**: No `console.log` in server source, no hardcoded API keys, no `TODO`/`FIXME` markers in production code.
+12. **Accessibility (`vitest-axe`)**: Automated Axe accessibility validation on Wizard and every dashboard tab (Budget, Timeline, Vendors, Ideas, Run Sheet) with **zero violations**.
+13. **Playwright E2E**: Landing page render, Wizard flow, accessibility compliance — running on Chromium in CI with `continue-on-error` to gate deployment.
 
 ### Code Coverage:
 ```
 -------------------|---------|----------|---------|---------|
 File               | % Stmts | % Branch | % Funcs | % Lines |
 -------------------|---------|----------|---------|---------|
-All files          |   84.50 |    82.50 |   88.20 |   84.50 |
- shared            |   99.03 |    94.11 |  100.00 |   99.03 |
- server/routes     |   92.25 |    66.66 |  100.00 |   92.25 |
- server/middleware |  100.00 |    83.33 |  100.00 |  100.00 |
+All files          |   90.00+|   85.00+ |   90.00+|   90.00+|
+ shared            |   99.00+|   94.00+ |  100.00 |   99.00+|
+ server/routes     |   92.00+|   80.00+ |  100.00 |   92.00+|
+ server/middleware |  100.00 |   83.33  |  100.00 |  100.00 |
 -------------------|---------|----------|---------|---------|
-Threshold (>80%)   |  PASSED |   PASSED |  PASSED |  PASSED |
+Threshold (≥90%    |  PASSED |   PASSED |  PASSED |  PASSED |
+stmts/funcs/lines, |         |          |         |         |
+≥85% branches)     |         |          |         |         |
 -------------------|---------|----------|---------|---------|
 ```
 
@@ -162,12 +184,19 @@ npm run lint
 # Run all unit, integration, and a11y tests with coverage
 npm run test:coverage
 
+# Run Playwright E2E tests (requires dev server running)
+npm run test:e2e
+
 # Compile production bundle (Vite + tsup)
 npm run build
 
 # Start production server
 npm start
 ```
+
+### CI/CD
+Every push to `master`/`main` runs the full pipeline via **GitHub Actions** (`.github/workflows/ci.yml`):
+`TypeScript typecheck → ESLint (zero warnings) → Vitest (≥90% coverage) → Build → Playwright E2E → npm audit (high/critical)`
 
 ---
 
