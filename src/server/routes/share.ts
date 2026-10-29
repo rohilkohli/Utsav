@@ -5,6 +5,7 @@ import { validateBody } from '../middleware/validate.js';
 import { writeLimiter } from '../middleware/rateLimit.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { getShareRepository } from '../repositories/index.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -38,7 +39,8 @@ router.post(
         shareUrl,
         expiresAt,
       });
-    } catch {
+    } catch (err) {
+      logger.error(`POST /api/share failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to create shareable link' });
     }
   },
@@ -58,7 +60,8 @@ router.get('/share/:token', async (req, res) => {
       return;
     }
     res.status(200).json(savedPlanSchema.parse(snapshot));
-  } catch {
+  } catch (err) {
+    logger.error(`GET /api/share/:token failed: ${err instanceof Error ? err.message : String(err)}`);
     res.status(500).json({ error: 'Failed to retrieve shared plan' });
   }
 });

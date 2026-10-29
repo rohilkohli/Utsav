@@ -35,5 +35,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build client for E2E
+        run: npm run build:client
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:5173
+          CI: true
+
       - name: Security audit (high/critical only)
         run: npm audit --audit-level=high

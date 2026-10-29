@@ -3,6 +3,7 @@ import { refineInputSchema } from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
 import { generationLimiter } from '../middleware/rateLimit.js';
 import { refineIdeasSection } from '../services/gemini.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -33,7 +34,8 @@ router.post(
         ideas: refinedIdeas,
         meta: { source },
       });
-    } catch {
+    } catch (err) {
+      logger.error(`POST /api/refine failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to refine section ideas' });
     }
   },

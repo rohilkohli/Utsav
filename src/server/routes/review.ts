@@ -15,6 +15,7 @@ import { planOutputSchema, wizardInputSchema } from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
 import { generationLimiter } from '../middleware/rateLimit.js';
 import { reviewPlan } from '../services/gemini.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -33,7 +34,8 @@ router.post(
       const { plan, input } = req.body;
       const { review, source } = await reviewPlan(plan, input);
       res.status(200).json({ review, meta: { source } });
-    } catch {
+    } catch (err) {
+      logger.error(`POST /api/review-plan failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to review plan' });
     }
   },

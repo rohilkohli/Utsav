@@ -432,7 +432,7 @@ export async function generateEventPlan(
   input: WizardInput,
 ): Promise<{ plan: PlanOutput; source: 'gemini' | 'cache' | 'fallback' }> {
   // Check LRU cache
-  const cacheKey = createPlanCacheKey(input as unknown as Record<string, unknown>);
+  const cacheKey = createPlanCacheKey(input as Record<string, unknown>);
   const cached = getCachedPlan(cacheKey);
   if (cached) {
     logger.info(`[Plan Generation] Source: cache (Event: ${input.eventType}, City: ${input.city})`);

@@ -13,6 +13,7 @@ import { generationLimiter, writeLimiter } from '../middleware/rateLimit.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { generateEventPlan } from '../services/gemini.js';
 import { getPlanRepository } from '../repositories/index.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -64,7 +65,8 @@ router.post(
         planId,
         meta: { source },
       });
-    } catch {
+    } catch (err) {
+      logger.error(`POST /api/plan failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to generate event plan' });
     }
   },
@@ -102,7 +104,8 @@ router.post(
         success: true,
         plan: savedPlanSchema.parse(savedPlan),
       });
-    } catch {
+    } catch (err) {
+      logger.error(`POST /api/plan/save failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to save plan' });
     }
   },
@@ -125,7 +128,8 @@ router.get('/plan/:id', requireAuth, async (req, res) => {
     }
 
     res.status(200).json(savedPlanSchema.parse(plan));
-  } catch {
+  } catch (err) {
+    logger.error(`GET /api/plan/:id failed: ${err instanceof Error ? err.message : String(err)}`);
     res.status(500).json({ error: 'Failed to retrieve plan' });
   }
 });
@@ -168,7 +172,8 @@ router.put(
         success: true,
         plan: savedPlanSchema.parse(updatedPlan),
       });
-    } catch {
+    } catch (err) {
+      logger.error(`PUT /api/plan/:id failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to update plan' });
     }
   },
