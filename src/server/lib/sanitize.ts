@@ -24,16 +24,20 @@ export function sanitizeText(str: string): string {
  * @param obj - Any value from a parsed JSON AI response
  * @returns Deep copy with all strings sanitized via sanitizeText
  */
+export function sanitizeObject(obj: string): string;
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T;
+export function sanitizeObject<T>(obj: T[]): T[];
+export function sanitizeObject<T>(obj: T): T;
 export function sanitizeObject<T>(obj: T): T {
   if (typeof obj === 'string') {
-    return sanitizeText(obj) as unknown as T;
+    return sanitizeText(obj) as T;
   }
   if (Array.isArray(obj)) {
-    return obj.map(sanitizeObject) as unknown as T;
+    return obj.map((item) => sanitizeObject(item)) as T;
   }
   if (obj && typeof obj === 'object') {
     const clean: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
       clean[k] = sanitizeObject(v);
     }
     return clean as T;

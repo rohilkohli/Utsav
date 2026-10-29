@@ -27,8 +27,18 @@ const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 const ai = new GoogleGenAI({ apiKey });
 
-/** Execute a promise with a timeout (default 30 seconds) */
-async function withTimeout<T>(promise: Promise<T>, timeoutMs = 30000): Promise<T> {
+// generateFallbackPlan is defined in ./fallback.ts (extracted for SRP).
+// Re-exported here so existing imports from this module continue to work.
+export { generateFallbackPlan } from './fallback.js';
+
+/**
+ * Wraps a promise with a hard timeout. Rejects with a descriptive error if
+ * the promise does not resolve within `timeoutMs` milliseconds.
+ *
+ * @param promise - The async operation to time-box
+ * @param timeoutMs - Maximum wait time in milliseconds (default 30 000)
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 30_000): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -43,16 +53,45 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs = 30000): Promise<T
   }
 }
 
-/** Sleep helper for retry exponential backoff */
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// generateFallbackPlan is defined in ./fallback.ts (extracted for SRP).
-// Re-exported here so existing imports from this module continue to work.
-export { generateFallbackPlan } from './fallback.js';
+/** Pause execution for `ms` milliseconds (used for retry backoff). */
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * Transforms raw Gemini JSON plan into fully enriched PlanOutput
- * with calculated rupee allocations (largest-remainder), unique IDs, and milestone dates.
+ * Generic Gemini retry wrapper: attempts `operation` up to `maxAttempts` times
+ * with `delayMs` backoff between attempts. Returns the first successful result
+ * or `null` when all attempts fail (caller decides on fallback strategy).
+ *
+ * @param operation - Async factory returning a result of type T
+ * @param context - Log prefix used in debug messages (e.g. '[Plan Generation]')
+ * @param maxAttempts - Total attempts including the first (default 2)
+ * @param delayMs - Wait between retries in milliseconds (default 1 500)
+ */
+async function withGeminiRetry<T>(
+  operation: () => Promise<T>,
+  context: string,
+  maxAttempts = 2,
+  delayMs = 1_500,
+): Promise<T | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      if (attempt > 0) await sleep(delayMs);
+      return await operation();
+    } catch (err) {
+      logger.debug(
+        `${context} attempt ${attempt + 1}/${maxAttempts} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * Transforms raw Gemini JSON plan into a fully enriched PlanOutput:
+ * calculates rupee allocations via the Largest-Remainder method,
+ * assigns unique IDs to every entity, and resolves absolute milestone dates.
+ *
+ * @param raw - Parsed and validated Gemini response object
+ * @param input - Original wizard input used to derive dates and budget totals
  */
 export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutput {
   const categoriesWithIds = raw.budget.map((b) => ({
@@ -75,7 +114,7 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
   }));
 
   const enrichedVendors = raw.vendors.map((v) => {
-    // Attempt matching budgeted amount with relevant category
+    // Match budgeted amount to the closest category by name substring
     const matchedCategory = enrichedBudget.find(
       (b) =>
         b.category.toLowerCase().includes(v.category.toLowerCase()) ||
@@ -113,13 +152,17 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
 }
 
 /**
- * Call Gemini API with structured response schema, 30s timeout, and 1 retry with backoff.
- * Returns enriched plan and meta source ('gemini' | 'cache' | 'fallback').
+ * Generates a fully enriched event plan via Gemini with LRU caching,
+ * structured JSON schema output, 30 s timeout, and one retry with backoff.
+ * Falls back to `generateFallbackPlan` when the API key is absent or all
+ * Gemini attempts fail.
+ *
+ * @param input - Validated wizard input from the client
+ * @returns Enriched plan with a `source` tag ('gemini' | 'cache' | 'fallback')
  */
 export async function generateEventPlan(
   input: WizardInput,
 ): Promise<{ plan: PlanOutput; source: 'gemini' | 'cache' | 'fallback' }> {
-  // Check LRU cache
   const cacheKey = createPlanCacheKey(input as Record<string, unknown>);
   const cached = getCachedPlan(cacheKey);
   if (cached) {
@@ -127,98 +170,102 @@ export async function generateEventPlan(
     return { plan: cached, source: 'cache' };
   }
 
-  // If no API key configured (e.g. initial dev or test), return fallback
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
     logger.info('[Plan Generation] Source: fallback (GEMINI_API_KEY not configured)');
-    const fallback = generateFallbackPlan(input);
-    return { plan: fallback, source: 'fallback' };
+    return { plan: generateFallbackPlan(input), source: 'fallback' };
   }
 
   const prompt = buildPlanPrompt(input);
   const jsonSchema = getGeminiPlanJsonSchema();
 
-  let _lastError: Error | null = null;
+  const result = await withGeminiRetry(
+    async () => {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: 'application/json',
+            responseJsonSchema: jsonSchema,
+            temperature: 0.7,
+          },
+        }),
+        30_000,
+      );
+      const validated = geminiRawPlanSchema.parse(sanitizeObject(JSON.parse(response.text || '')));
+      return enrichRawPlan(validated, input);
+    },
+    '[Plan Generation]',
+  );
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      if (attempt > 0) {
-        // Exponential backoff before retry (1.5s)
-        await sleep(1500);
-      }
-
-      const generateCall = ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: 'application/json',
-          responseJsonSchema: jsonSchema,
-          temperature: 0.7,
-        },
-      });
-
-      const response = await withTimeout(generateCall, 30000);
-      const text = response.text || '';
-      const parsed = JSON.parse(text);
-      const sanitized = sanitizeObject(parsed);
-      const validated = geminiRawPlanSchema.parse(sanitized);
-
-      const enriched = enrichRawPlan(validated, input);
-      setCachedPlan(cacheKey, enriched);
-
-      logger.info(`[Plan Generation] Source: gemini (Model: ${modelName}, Event: ${input.eventType})`);
-      return { plan: enriched, source: 'gemini' };
-    } catch (err) {
-      _lastError = err instanceof Error ? err : new Error(String(err));
-    }
+  if (result) {
+    setCachedPlan(cacheKey, result);
+    logger.info(`[Plan Generation] Source: gemini (Model: ${modelName}, Event: ${input.eventType})`);
+    return { plan: result, source: 'gemini' };
   }
 
-  // If both attempts failed, return graceful fallback plan
-  logger.warn(`[Plan Generation] Source: fallback (Gemini error: ${_lastError?.message || 'unknown'})`);
-  const fallback = generateFallbackPlan(input);
-  return { plan: fallback, source: 'fallback' };
+  logger.warn('[Plan Generation] Source: fallback (all Gemini attempts failed)');
+  return { plan: generateFallbackPlan(input), source: 'fallback' };
 }
 
+/** Structured AI review returned by {@link reviewPlan}. */
 export interface PlanReview {
   strengths: string[];
   risks: string[];
   suggestions: string[];
-  overallScore: number; // 1-10
+  /** Overall plan health score from 1 (poor) to 10 (excellent). */
+  overallScore: number;
 }
 
 /**
- * AI-powered plan review: returns strengths, risks, and actionable suggestions.
- * Falls back to a heuristic review when Gemini is unavailable.
+ * Builds a heuristic plan review without calling Gemini.
+ * Used when the API key is absent or all Gemini attempts fail.
+ */
+function buildHeuristicReview(plan: PlanOutput, input: WizardInput): PlanReview {
+  const overBudget = plan.budget.reduce((s, c) => s + c.actual, 0) > input.totalBudget;
+  const unbookedVendors = plan.vendors.filter((v) => v.status === 'to-contact').length;
+  const completedMilestones = plan.timeline.filter((m) => m.completed).length;
+  return {
+    strengths: [
+      `${plan.vendors.length} vendor categories identified`,
+      `${plan.timeline.length} timeline milestones planned`,
+      completedMilestones > 0
+        ? `${completedMilestones} milestones already completed`
+        : 'Plan ready to execute',
+    ],
+    risks: [
+      overBudget
+        ? 'Actual spend exceeds total budget — review categories'
+        : 'Budget allocation looks healthy',
+      unbookedVendors > 3
+        ? `${unbookedVendors} vendors still uncontacted — start booking early`
+        : 'Vendor booking on track',
+    ],
+    suggestions: [
+      'Get 2-3 competing quotes per vendor category to ensure best value',
+      'Mark milestones as complete as you progress to stay on track',
+      'Share the plan link with family coordinators for visibility',
+    ],
+    overallScore: overBudget ? 6 : unbookedVendors > plan.vendors.length / 2 ? 7 : 8,
+  };
+}
+
+/**
+ * AI-powered plan review returning structured strengths, risks, and
+ * actionable suggestions. Falls back to a heuristic review when Gemini is
+ * unavailable (no key or all retries exhausted).
+ *
+ * @param plan - The saved plan to review
+ * @param input - Wizard input that produced the plan
+ * @returns Review object with a `source` tag ('gemini' | 'fallback')
  */
 export async function reviewPlan(
   plan: PlanOutput,
   input: WizardInput,
 ): Promise<{ review: PlanReview; source: 'gemini' | 'fallback' }> {
-  const heuristicReview = (): PlanReview => {
-    const overBudget = plan.budget.reduce((s, c) => s + c.actual, 0) > input.totalBudget;
-    const unbookedVendors = plan.vendors.filter((v) => v.status === 'to-contact').length;
-    const completedMilestones = plan.timeline.filter((m) => m.completed).length;
-    return {
-      strengths: [
-        `${plan.vendors.length} vendor categories identified`,
-        `${plan.timeline.length} timeline milestones planned`,
-        completedMilestones > 0 ? `${completedMilestones} milestones already completed` : 'Plan ready to execute',
-      ],
-      risks: [
-        overBudget ? 'Actual spend exceeds total budget — review categories' : 'Budget allocation looks healthy',
-        unbookedVendors > 3 ? `${unbookedVendors} vendors still uncontacted — start booking early` : 'Vendor booking on track',
-      ],
-      suggestions: [
-        'Get 2-3 competing quotes per vendor category to ensure best value',
-        'Mark milestones as complete as you progress to stay on track',
-        'Share the plan link with family coordinators for visibility',
-      ],
-      overallScore: overBudget ? 6 : unbookedVendors > plan.vendors.length / 2 ? 7 : 8,
-    };
-  };
-
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    return { review: heuristicReview(), source: 'fallback' };
+    return { review: buildHeuristicReview(plan, input), source: 'fallback' };
   }
 
   const prompt = `You are Utsav, an expert Indian event planner. Review this celebration plan and give honest feedback.
@@ -232,37 +279,54 @@ MILESTONE COUNT: ${plan.timeline.length}
 
 Respond with JSON: { "strengths": [3 strings], "risks": [2-3 strings], "suggestions": [3 actionable strings], "overallScore": number 1-10 }`;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      if (attempt > 0) await sleep(1000);
-      const generateCall = ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: 'application/json',
-          temperature: 0.5,
-        },
-      });
-      const response = await withTimeout(generateCall, 20000);
-      const text = response.text || '';
-      const parsed = sanitizeObject(JSON.parse(text)) as PlanReview;
-      if (Array.isArray(parsed.strengths) && Array.isArray(parsed.risks) && Array.isArray(parsed.suggestions)) {
-        logger.info(`[Review Plan] Source: gemini`);
-        return { review: parsed, source: 'gemini' };
+  const result = await withGeminiRetry(
+    async () => {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: 'application/json',
+            temperature: 0.5,
+          },
+        }),
+        20_000,
+      );
+      const parsed = sanitizeObject(JSON.parse(response.text || '')) as PlanReview;
+      if (
+        !Array.isArray(parsed.strengths) ||
+        !Array.isArray(parsed.risks) ||
+        !Array.isArray(parsed.suggestions)
+      ) {
+        throw new Error('Invalid review structure from Gemini');
       }
-    } catch (err) {
-      logger.debug(`[Review Plan] Attempt ${attempt + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+      return parsed;
+    },
+    '[Review Plan]',
+    2,
+    1_000,
+  );
+
+  if (result) {
+    logger.info('[Review Plan] Source: gemini');
+    return { review: result, source: 'gemini' };
   }
 
   logger.warn('[Review Plan] Source: fallback (Gemini API failed)');
-  return { review: heuristicReview(), source: 'fallback' };
+  return { review: buildHeuristicReview(plan, input), source: 'fallback' };
 }
 
 /**
- * Refine ideas for a specific section via Gemini with retry and fallback.
- * Returns refined ideas and meta source ('gemini' | 'fallback').
+ * Refines ideas for a specific section via Gemini with one retry and backoff.
+ * Returns the unchanged `currentIdeas` array when the API key is absent or
+ * all Gemini attempts fail, ensuring the UI always has something to show.
+ *
+ * @param section - Dashboard section being refined (e.g. 'food', 'decor')
+ * @param instruction - User's free-text refinement instruction (≤300 chars)
+ * @param input - Original wizard input for context
+ * @param currentIdeas - Existing ideas shown if Gemini is unavailable
+ * @returns New ideas array with a `source` tag ('gemini' | 'fallback')
  */
 export async function refineIdeasSection(
   section: IdeaSection,
@@ -278,30 +342,25 @@ export async function refineIdeasSection(
   const prompt = buildRefinePrompt(section, instruction, input);
   const jsonSchema = getGeminiRefineJsonSchema();
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      if (attempt > 0) {
-        await sleep(1000);
-      }
-
-      const generateCall = ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: 'application/json',
-          responseJsonSchema: jsonSchema,
-          temperature: 0.8,
-        },
-      });
-
-      const response = await withTimeout(generateCall, 30000);
-      const text = response.text || '';
-      const parsed = JSON.parse(text);
-      const sanitized = sanitizeObject(parsed);
-      const validated = geminiRefineOutputSchema.parse(sanitized);
-
-      const ideas = validated.ideas.map((raw) => ({
+  const result = await withGeminiRetry(
+    async () => {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: 'application/json',
+            responseJsonSchema: jsonSchema,
+            temperature: 0.8,
+          },
+        }),
+        30_000,
+      );
+      const validated = geminiRefineOutputSchema.parse(
+        sanitizeObject(JSON.parse(response.text || '')),
+      );
+      return validated.ideas.map((raw) => ({
         id: nanoid(),
         section: raw.section,
         title: raw.title,
@@ -309,12 +368,15 @@ export async function refineIdeasSection(
         estimatedCost: raw.estimatedCost,
         subEvent: raw.subEvent,
       }));
+    },
+    `[Refine Section:${section}]`,
+    2,
+    1_000,
+  );
 
-      logger.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
-      return { ideas, source: 'gemini' };
-    } catch (err) {
-      logger.debug(`[Refine Section] Attempt ${attempt + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  if (result) {
+    logger.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
+    return { ideas: result, source: 'gemini' };
   }
 
   logger.warn(`[Refine Section] Source: fallback (Gemini API failed for section ${section})`);

@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import { z } from 'zod';
 import { wizardInputSchema, planOutputSchema, savedPlanSchema } from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
-import { writeLimiter } from '../middleware/rateLimit.js';
+import { writeLimiter, readLimiter } from '../middleware/rateLimit.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { getShareRepository } from '../repositories/index.js';
 import { logger } from '../lib/logger.js';
@@ -50,8 +50,9 @@ router.post(
  * Retrieve read-only guest snapshot by token.
  * Fails closed with 404 if expired, missing, or corrupt.
  * Maps explicitly through savedPlanSchema to prevent leaking internal fields.
+ * Protected by readLimiter (60 req / 15 min) to prevent token enumeration.
  */
-router.get('/share/:token', async (req, res) => {
+router.get('/share/:token', readLimiter, async (req, res) => {
   try {
     const shareRepo = getShareRepository();
     const snapshot = await shareRepo.getShare(req.params.token);
