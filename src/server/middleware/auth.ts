@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import admin from 'firebase-admin';
+import { logger } from '../lib/logger.js';
 
 export interface AuthenticatedUser {
   uid: string;
@@ -43,7 +44,8 @@ export function setTokenVerifier(verifier: TokenVerifier | null): void {
 export async function verifyToken(token: string): Promise<AuthenticatedUser | null> {
   try {
     return await activeVerifier(token);
-  } catch {
+  } catch (err) {
+    logger.debug(`[Auth] Token verification failed: ${err instanceof Error ? err.message : 'invalid token'}`);
     return null;
   }
 }

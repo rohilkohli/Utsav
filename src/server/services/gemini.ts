@@ -251,8 +251,8 @@ Respond with JSON: { "strengths": [3 strings], "risks": [2-3 strings], "suggesti
         logger.info(`[Review Plan] Source: gemini`);
         return { review: parsed, source: 'gemini' };
       }
-    } catch {
-      // retry
+    } catch (err) {
+      logger.debug(`[Review Plan] Attempt ${attempt + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -312,8 +312,8 @@ export async function refineIdeasSection(
 
       logger.info(`[Refine Section] Source: gemini (Section: ${section}, Model: ${modelName})`);
       return { ideas, source: 'gemini' };
-    } catch {
-      // Continue loop for retry
+    } catch (err) {
+      logger.debug(`[Refine Section] Attempt ${attempt + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

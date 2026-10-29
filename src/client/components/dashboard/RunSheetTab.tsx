@@ -23,7 +23,7 @@ export const RunSheetTab: React.FC<RunSheetTabProps> = ({ eventType, eventDate }
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>📋</span>
+          <span aria-hidden="true" style={{ fontSize: '1.5rem' }}>📋</span>
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
             Day-of Run Sheet — {sheet.eventLabel}
           </h2>

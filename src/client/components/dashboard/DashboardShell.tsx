@@ -130,7 +130,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>⚠️</span>
             <strong style={{ fontSize: '0.95rem' }}>
               You are ₹{budgetTotals.overBudgetAmount.toLocaleString('en-IN')} over budget. Here are 3 ways to fix it:
             </strong>
@@ -297,8 +297,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           return (
             <button
               key={t.id}
+              id={`tab-${t.id}`}
               role="tab"
               aria-selected={isSelected}
+              aria-controls={`panel-${t.id}`}
+              tabIndex={isSelected ? 0 : -1}
               onClick={() => setActiveTab(t.id)}
               style={{
                 display: 'flex',
@@ -319,7 +322,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              <span>{t.icon}</span>
+              <span aria-hidden="true">{t.icon}</span>
               <span>{t.label}</span>
             </button>
           );
@@ -327,40 +330,52 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
       </div>
 
       {/* Active Tab Content */}
-      <main id="main">
-        {activeTab === 'budget' && (
-          <BudgetTab
-            categories={plan.budget}
-            totalBudget={input.totalBudget}
-            onUpdateCategories={handleUpdateCategories}
-          />
-        )}
-        {activeTab === 'timeline' && (
-          <TimelineTab
-            milestones={plan.timeline}
-            eventDate={input.eventDate}
-            onToggleMilestone={handleToggleMilestone}
-          />
-        )}
-        {activeTab === 'vendors' && (
-          <VendorsTab
-            vendors={plan.vendors}
-            city={input.city}
-            onUpdateVendor={handleUpdateVendor}
-          />
-        )}
-        {activeTab === 'ideas' && (
-          <IdeasTab
-            ideas={plan.ideas}
-            input={input}
-            currentPlan={plan}
-            onUpdateIdeas={handleUpdateIdeas}
-          />
-        )}
-        {activeTab === 'runsheet' && (
-          <RunSheetTab eventType={input.eventType} eventDate={input.eventDate} />
-        )}
-      </main>
+      {tabs.map((t) => (
+        <div
+          key={t.id}
+          id={`panel-${t.id}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${t.id}`}
+          hidden={activeTab !== t.id}
+        >
+          {activeTab === t.id && (
+            <>
+              {t.id === 'budget' && (
+                <BudgetTab
+                  categories={plan.budget}
+                  totalBudget={input.totalBudget}
+                  onUpdateCategories={handleUpdateCategories}
+                />
+              )}
+              {t.id === 'timeline' && (
+                <TimelineTab
+                  milestones={plan.timeline}
+                  eventDate={input.eventDate}
+                  onToggleMilestone={handleToggleMilestone}
+                />
+              )}
+              {t.id === 'vendors' && (
+                <VendorsTab
+                  vendors={plan.vendors}
+                  city={input.city}
+                  onUpdateVendor={handleUpdateVendor}
+                />
+              )}
+              {t.id === 'ideas' && (
+                <IdeasTab
+                  ideas={plan.ideas}
+                  input={input}
+                  currentPlan={plan}
+                  onUpdateIdeas={handleUpdateIdeas}
+                />
+              )}
+              {t.id === 'runsheet' && (
+                <RunSheetTab eventType={input.eventType} eventDate={input.eventDate} />
+              )}
+            </>
+          )}
+        </div>
+      ))}
 
       {/* Share Modal */}
       <ShareModal
