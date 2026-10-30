@@ -12,6 +12,7 @@ function makeResponse(body: unknown, status = 200) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('Places service — searchVendorsByCategory', () => {

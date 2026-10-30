@@ -1,8 +1,15 @@
 import '@testing-library/jest-dom';
 import * as matchers from 'vitest-axe/matchers';
-import { expect } from 'vitest';
+import { expect, afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
 expect.extend(matchers);
+
+// Explicit cleanup after every test — required when singleFork:true shares the jsdom
+// document across test files (RTL's own afterEach registration can miss cross-file runs).
+afterEach(() => {
+  cleanup();
+});
 
 // Mock HTMLCanvasElement.getContext for jsdom and axe-core color-contrast checking
 // Guard: HTMLCanvasElement is only available in jsdom environments
