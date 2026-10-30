@@ -27,6 +27,9 @@ export default defineConfig({
     },
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // After all tests complete, wait at most 5 s for open handles (e.g. Firebase
+    // gRPC keep-alive connections) before force-exiting — prevents 20-min CI hangs.
+    teardownTimeout: 5_000,
     coverage: {
       provider: 'v8',
       include: ['src/shared/**/*.ts', 'src/server/**/*.ts'],

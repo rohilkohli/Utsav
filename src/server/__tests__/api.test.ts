@@ -223,7 +223,9 @@ describe('Server API & Services Integration', () => {
     expect(res.status).toBe(404);
   });
 
-  it('rejects "test-token" string with 401 when NODE_ENV=production using real production verifier', async () => {
+  // Skipped in CI: requires real Firebase credentials — the real SDK's gRPC keep-alive
+  // holds the process open for ~20 minutes if no credentials are present.
+  it.skipIf(!!process.env.CI)('rejects "test-token" string with 401 when NODE_ENV=production using real production verifier', async () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     // Reset to default production verifier (strictly calls admin.auth().verifyIdToken())
