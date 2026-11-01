@@ -119,7 +119,7 @@ router.post(
 router.get('/plan/:id', requireAuth, async (req, res) => {
   try {
     const planRepo = getPlanRepository();
-    const plan = await planRepo.getPlan(req.params.id);
+    const plan = await planRepo.getPlan(String(req.params.id));
 
     // Fail closed with 404 for missing documents or unauthorized cross-user access
     if (!plan || plan.ownerUid !== req.user!.uid) {
@@ -150,7 +150,7 @@ router.put(
   async (req, res) => {
     try {
       const planRepo = getPlanRepository();
-      const existingPlan = await planRepo.getPlan(req.params.id);
+      const existingPlan = await planRepo.getPlan(String(req.params.id));
 
       if (!existingPlan || existingPlan.ownerUid !== req.user!.uid) {
         res.status(404).json({ error: 'Plan not found' });

@@ -25,9 +25,9 @@ export async function initFirebase(): Promise<Auth | null> {
     if (!getApps().length) {
       app = initializeApp(config.firebase);
     } else {
-      app = getApps()[0];
+      app = getApps()[0] ?? null;
     }
-    auth = getAuth(app);
+    auth = getAuth(app ?? undefined);
     return auth;
   } catch {
     return null;

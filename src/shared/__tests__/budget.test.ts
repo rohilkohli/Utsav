@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   allocateAmountsByLargestRemainder,
+  ensureContingencyCategory,
   populateCategoryAmounts,
   calculateBudgetTotals,
   applyBudgetCut,
@@ -8,6 +9,16 @@ import {
 } from '../budget.js';
 
 describe('Budget Math - Deterministic Allocation', () => {
+  it('adds a dedicated ten percent contingency buffer', () => {
+    const categories = ensureContingencyCategory([
+      { id: 'venue', category: 'Venue', suggestedPercent: 60 },
+      { id: 'food', category: 'Food', suggestedPercent: 40 },
+    ]);
+    expect(categories.at(-1)?.category).toBe('Contingency Buffer');
+    expect(categories.at(-1)?.suggestedPercent).toBe(10);
+    expect(categories.slice(0, -1).reduce((sum, category) => sum + category.suggestedPercent, 0)).toBe(90);
+  });
+
   it('allocates amounts such that sum equals EXACTLY the total budget (Largest-Remainder)', () => {
     const items = [
       { suggestedPercent: 33.33 },

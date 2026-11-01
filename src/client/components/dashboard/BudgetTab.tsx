@@ -6,16 +6,26 @@ import { formatINR, parseINR } from '@shared/currency';
 interface BudgetTabProps {
   categories: BudgetCategory[];
   totalBudget: number;
+  guestCount: number;
+  perPlate: number;
   onUpdateCategories: (updated: BudgetCategory[], newTotalBudget?: number) => void;
+  onUpdateGuestCount: (guestCount: number) => void;
+  onUpdatePerPlate: (perPlate: number) => void;
 }
 
 export const BudgetTab: React.FC<BudgetTabProps> = ({
   categories,
   totalBudget,
+  guestCount,
+  perPlate,
   onUpdateCategories,
+  onUpdateGuestCount,
+  onUpdatePerPlate,
 }) => {
   const totals = calculateBudgetTotals(categories, totalBudget);
   const grouped = groupCategoriesBySubEvent(categories);
+  const cateringBudget = categories.find((category) => /cater|food|prasad/i.test(category.category))?.amount ?? 0;
+  const cateringShortfall = Math.max(0, guestCount * perPlate - cateringBudget);
 
   const handleActualChange = (id: string, newActual: number) => {
     const updated = categories.map((c) => (c.id === id ? { ...c, actual: newActual } : c));
@@ -58,6 +68,20 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
           <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
             +{formatINR(totals.overBudgetAmount)}
           </span>
+        </div>
+      )}
+
+      <div className="budget-catering-controls" aria-label="Catering inputs">
+        <label htmlFor="budget-guest-count">Guests
+          <input id="budget-guest-count" type="number" min="0" value={guestCount} onChange={(event) => onUpdateGuestCount(Number(event.target.value))} />
+        </label>
+        <label htmlFor="budget-per-plate">Per-plate cost (₹)
+          <input id="budget-per-plate" type="number" min="0" value={perPlate || ''} onChange={(event) => onUpdatePerPlate(Number(event.target.value))} />
+        </label>
+      </div>
+      {cateringShortfall > 0 && (
+        <div className="catering-shortfall" aria-live="polite">
+          Catering shortfall: {formatINR(cateringShortfall)} needed for {guestCount.toLocaleString('en-IN')} guests at {formatINR(perPlate)} per plate.
         </div>
       )}
 
@@ -149,33 +173,50 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
       </div>
 
       {/* Visual Budget Distribution Bar */}
-      <div style={{
-        background: 'var(--surface-card)',
-        padding: '1.25rem',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--surface-border)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
+      <div
+        style={{
+          background: 'var(--surface-card)',
+          padding: '1.25rem',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--surface-border)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginBottom: '0.75rem',
+          }}
+        >
           <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>📊 Budget Distribution</span>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             {categories.length} categories · Gemini-suggested percentages
           </span>
         </div>
         {/* Stacked bar */}
-        <div style={{
-          height: '22px',
-          borderRadius: 'var(--radius-full)',
-          overflow: 'hidden',
-          display: 'flex',
-          marginBottom: '0.75rem',
-          border: '1px solid var(--surface-border)',
-        }}>
+        <div
+          style={{
+            height: '22px',
+            borderRadius: 'var(--radius-full)',
+            overflow: 'hidden',
+            display: 'flex',
+            marginBottom: '0.75rem',
+            border: '1px solid var(--surface-border)',
+          }}
+        >
           {categories.map((cat, idx) => {
             const pct = totalBudget > 0 ? (cat.amount / totalBudget) * 100 : 0;
             // Cycle through a palette
             const colors = [
-              'var(--primary-saffron)', 'var(--primary-magenta)', 'var(--primary-emerald)',
-              'var(--primary-gold)', '#7c3aed', '#0891b2', '#dc2626', '#16a34a',
+              'var(--primary-saffron)',
+              'var(--primary-magenta)',
+              'var(--primary-emerald)',
+              'var(--primary-gold)',
+              '#7c3aed',
+              '#0891b2',
+              '#dc2626',
+              '#16a34a',
             ];
             return (
               <div
@@ -195,12 +236,36 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.75rem' }}>
           {categories.map((cat, idx) => {
             const colors = [
-              'var(--primary-saffron)', 'var(--primary-magenta)', 'var(--primary-emerald)',
-              'var(--primary-gold)', '#7c3aed', '#0891b2', '#dc2626', '#16a34a',
+              'var(--primary-saffron)',
+              'var(--primary-magenta)',
+              'var(--primary-emerald)',
+              'var(--primary-gold)',
+              '#7c3aed',
+              '#0891b2',
+              '#dc2626',
+              '#16a34a',
             ];
             return (
-              <span key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: colors[idx % colors.length], flexShrink: 0, display: 'inline-block' }} />
+              <span
+                key={cat.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <span
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '2px',
+                    background: colors[idx % colors.length],
+                    flexShrink: 0,
+                    display: 'inline-block',
+                  }}
+                />
                 {cat.category} ({cat.suggestedPercent}%)
               </span>
             );
@@ -227,7 +292,8 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
             ✂️ Quick Budget Cut
           </span>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Instantly reduce total budget — all categories re-balance to the exact rupee using Largest-Remainder math. No AI, no drift.
+            Instantly reduce total budget — all categories re-balance to the exact rupee using
+            Largest-Remainder math. No AI, no drift.
           </span>
         </div>
 
@@ -328,27 +394,47 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
                         <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
                           {cat.category}
                           {cat.subEvent && (
-                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: 'var(--primary-magenta)', marginTop: '0.1rem' }}>
+                            <span
+                              style={{
+                                display: 'block',
+                                fontSize: '0.72rem',
+                                fontWeight: 500,
+                                color: 'var(--primary-magenta)',
+                                marginTop: '0.1rem',
+                              }}
+                            >
                               {cat.subEvent}
                             </span>
                           )}
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{
-                              width: '60px', height: '6px',
-                              borderRadius: 'var(--radius-full)',
-                              background: 'rgba(0,0,0,0.08)',
-                              overflow: 'hidden',
-                            }}>
-                              <div style={{
-                                height: '100%',
-                                width: `${Math.min(100, cat.suggestedPercent)}%`,
-                                background: 'linear-gradient(90deg, var(--primary-saffron), var(--primary-magenta))',
+                            <div
+                              style={{
+                                width: '60px',
+                                height: '6px',
                                 borderRadius: 'var(--radius-full)',
-                              }} />
+                                background: 'rgba(0,0,0,0.08)',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: '100%',
+                                  width: `${Math.min(100, cat.suggestedPercent)}%`,
+                                  background:
+                                    'linear-gradient(90deg, var(--primary-saffron), var(--primary-magenta))',
+                                  borderRadius: 'var(--radius-full)',
+                                }}
+                              />
                             </div>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', minWidth: '34px' }}>
+                            <span
+                              style={{
+                                fontSize: '0.85rem',
+                                color: 'var(--text-muted)',
+                                minWidth: '34px',
+                              }}
+                            >
                               {cat.suggestedPercent}%
                             </span>
                           </div>
@@ -362,7 +448,7 @@ export const BudgetTab: React.FC<BudgetTabProps> = ({
                             value={formatINR(cat.actual)}
                             onChange={(e) => {
                               const parsed = parseINR(e.target.value);
-                              handleActualChange(cat.id, parsed);
+                              if (parsed !== null) handleActualChange(cat.id, parsed);
                             }}
                             aria-label={`Actual spend for ${cat.category}`}
                             style={{

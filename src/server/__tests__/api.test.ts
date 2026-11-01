@@ -12,8 +12,19 @@ import type { SavedPlan, WizardInput, PlanOutput } from '../../shared/schemas.js
 describe('Server API & Services Integration', () => {
   let server: Server;
   let baseUrl: string;
+  let originalFetch: typeof fetch;
 
   beforeAll(async () => {
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      if (method !== 'POST' && method !== 'PUT') return originalFetch(input, init);
+      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+      if (!headers.has('Origin')) headers.set('Origin', requestUrl.origin);
+      return originalFetch(input, { ...init, headers });
+    }) as typeof fetch;
+
     // Inject mock TokenVerifier for integration tests
     setTokenVerifier(async (token: string) => {
       if (token.startsWith('test-token-')) {
@@ -38,6 +49,7 @@ describe('Server API & Services Integration', () => {
   });
 
   afterAll(async () => {
+    globalThis.fetch = originalFetch;
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });

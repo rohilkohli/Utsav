@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 
 interface HeaderProps {
@@ -8,6 +8,14 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) => {
   const { user, login, logout, isGuest } = useAuth();
+  const [isDark, setIsDark] = useState(() => document.documentElement.dataset.theme === 'dark');
+
+  const toggleTheme = () => {
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem('utsav-theme', nextTheme);
+    setIsDark(!isDark);
+  };
 
   return (
     <>
@@ -71,6 +79,15 @@ export const Header: React.FC<HeaderProps> = ({ onNewPlan, showNewPlanButton }) 
         </div>
 
         <nav aria-label="Main navigation" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="theme-toggle"
+          >
+            {isDark ? '☀' : '☾'}
+          </button>
           {showNewPlanButton && onNewPlan && (
             <button
               onClick={onNewPlan}

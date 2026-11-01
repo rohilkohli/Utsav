@@ -6,6 +6,7 @@ import { EventDetailsStep } from './EventDetailsStep';
 import { BudgetStep } from './BudgetStep';
 import { PreferencesStep } from './PreferencesStep';
 import { ReviewStep } from './ReviewStep';
+import { DescribeEvent } from './DescribeEvent';
 
 interface WizardShellProps {
   onGeneratePlan: (input: WizardInput) => Promise<void>;
@@ -82,6 +83,11 @@ export const WizardShell: React.FC<WizardShellProps> = ({ onGeneratePlan, isGene
     });
   };
 
+  const applyParsedInput = (input: WizardInput) => {
+    setFormData(input);
+    setStep(5);
+  };
+
   const canProceed = () => {
     if (step === 1 && formData.eventType === 'wedding') {
       return formData.subEvents.length > 0;
@@ -107,6 +113,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({ onGeneratePlan, isGene
         border: '1px solid var(--surface-border)',
       }}
     >
+      <DescribeEvent onApply={applyParsedInput} onInstantCreate={onGeneratePlan} />
       {/* Progress Bar */}
       <nav aria-label="Planning Progress" style={{ marginBottom: '2.5rem' }}>
         <ol

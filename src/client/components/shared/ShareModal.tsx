@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { WizardInput, PlanOutput } from '@shared/schemas';
 import { apiCreateShare } from '../../lib/api';
 import { formatINR } from '@shared/currency';
@@ -14,6 +14,41 @@ export const ShareModal: React.FC<ShareModalProps> = ({ input, plan, isOpen, onC
   const [shareUrl, setShareUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      triggerRef.current?.focus();
+      return;
+    }
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, a[href], input, textarea, [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hasAttribute('disabled'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -50,6 +85,7 @@ ${shareUrl || window.location.href}`;
       role="dialog"
       aria-modal="true"
       aria-labelledby="share-modal-title"
+      ref={dialogRef}
       style={{
         position: 'fixed',
         inset: 0,
@@ -76,6 +112,7 @@ ${shareUrl || window.location.href}`;
       >
         <button
           type="button"
+          ref={closeButtonRef}
           onClick={onClose}
           aria-label="Close share dialog"
           style={{

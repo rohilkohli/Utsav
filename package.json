@@ -13,6 +13,7 @@
     "build:server": "tsup src/server/index.ts --format esm --out-dir dist/server --clean --target node22",
     "start": "node dist/server/index.js",
     "lint": "eslint src/ --max-warnings 0",
+    "typecheck": "tsc --noEmit",
     "test": "cross-env NODE_OPTIONS=--max-old-space-size=2048 vitest run",
     "test:coverage": "cross-env NODE_OPTIONS=--max-old-space-size=2048 vitest run --coverage",
     "test:e2e": "playwright test",
@@ -33,6 +34,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.5",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -44,6 +46,7 @@
     "@types/express": "^5.0.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@types/ws": "^8.18.2",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "@vitejs/plugin-react": "^4.3.4",

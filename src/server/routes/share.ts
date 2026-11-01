@@ -55,7 +55,7 @@ router.post(
 router.get('/share/:token', readLimiter, async (req, res) => {
   try {
     const shareRepo = getShareRepository();
-    const snapshot = await shareRepo.getShare(req.params.token);
+    const snapshot = await shareRepo.getShare(String(req.params.token));
     if (!snapshot) {
       res.status(404).json({ error: 'Shared plan not found or link has expired' });
       return;

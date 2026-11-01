@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import type { PlanOutput, WizardInput } from '@shared/schemas';
-import { apiGeneratePlan, apiGetPlan } from './lib/api';
+import { apiGeneratePlan, apiGetPlan, apiSavePlan, apiUpdatePlan } from './lib/api';
 import { AuthProvider } from './components/auth/AuthContext';
 import { Header } from './components/shared/Header';
 import { WizardShell } from './components/wizard/WizardShell';
@@ -20,7 +20,11 @@ const MainPlanner: React.FC = () => {
   const [isFallback, setIsFallback] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet'>('budget');
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet'
+  >('budget');
+  const updateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load plan on mount or refresh:
   // For guests, loads safely from localStorage (never calls GET /api/plan/:id which would 401).
@@ -53,6 +57,26 @@ const MainPlanner: React.FC = () => {
     }
   }, [user, routePlanId, currentPlan]);
 
+  useEffect(() => {
+    if (!user || currentPlanId !== 'guest_plan' || !currentPlan || !currentInput) return;
+    let active = true;
+    void user
+      .getIdToken()
+      .then((token) => apiSavePlan(currentInput, currentPlan, token))
+      .then((saved) => {
+        if (!active) return;
+        setCurrentPlanId(saved.id);
+        clearGuestPlan();
+        setNoticeMessage('Your guest plan is now saved to your account.');
+      })
+      .catch(() => {
+        if (active) setErrorMessage('We could not migrate your guest plan yet.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [user, currentPlanId, currentPlan, currentInput]);
+
   const handleGeneratePlan = async (input: WizardInput) => {
     setIsGenerating(true);
     setErrorMessage(null);
@@ -76,18 +100,46 @@ const MainPlanner: React.FC = () => {
     }
   };
 
-  const handleUpdatePlan = (updated: PlanOutput, newBudget?: number) => {
+  const handleUpdatePlan = (updated: PlanOutput, newBudget?: number, newGuestCount?: number) => {
     setCurrentPlan(updated);
     let updatedInput = currentInput;
     if (newBudget !== undefined && currentInput) {
       updatedInput = { ...currentInput, totalBudget: newBudget };
       setCurrentInput(updatedInput);
     }
+    if (newGuestCount !== undefined && updatedInput) {
+      updatedInput = { ...updatedInput, guestCount: newGuestCount };
+      setCurrentInput(updatedInput);
+    }
     // Update local storage for guests
     if (!user && currentPlanId && updatedInput) {
       saveGuestPlan(currentPlanId, updatedInput, updated);
     }
+    if (user && currentPlanId && currentPlanId !== 'guest_plan' && updatedInput) {
+      if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+      updateTimerRef.current = setTimeout(() => {
+        void user.getIdToken().then((token) =>
+          apiUpdatePlan(
+            {
+              id: currentPlanId,
+              input: updatedInput,
+              plan: updated,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+            token,
+          ),
+        );
+      }, 500);
+    }
   };
+
+  useEffect(
+    () => () => {
+      if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+    },
+    [],
+  );
 
   const handleNewPlan = () => {
     setCurrentPlan(null);
@@ -121,6 +173,12 @@ const MainPlanner: React.FC = () => {
         </div>
       )}
 
+      {noticeMessage && (
+        <div className="container" role="status" style={{ marginTop: '1.5rem' }}>
+          <div className="notice-banner">{noticeMessage}</div>
+        </div>
+      )}
+
       <VoiceAgent
         plan={currentPlan}
         input={currentInput}
@@ -141,19 +199,22 @@ const MainPlanner: React.FC = () => {
         <main id="main">
           <div className="container" style={{ textAlign: 'center', paddingTop: '2.5rem' }}>
             <div style={{ marginBottom: '0.75rem' }}>
-              <span style={{
-                display: 'inline-block',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                background: 'linear-gradient(135deg, var(--primary-saffron), var(--primary-magenta))',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                border: '1px solid rgba(230,81,0,0.25)',
-                padding: '0.3rem 0.8rem',
-                borderRadius: 'var(--radius-full)',
-              }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  background:
+                    'linear-gradient(135deg, var(--primary-saffron), var(--primary-magenta))',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  border: '1px solid rgba(230,81,0,0.25)',
+                  padding: '0.3rem 0.8rem',
+                  borderRadius: 'var(--radius-full)',
+                }}
+              >
                 🎯 Hack2Skill × VirtualPromptWars — Challenge 5
               </span>
             </div>
@@ -198,21 +259,52 @@ const MainPlanner: React.FC = () => {
               }}
             >
               {[
-                { icon: '💰', title: 'Zero Rupee Drift', desc: 'Deterministic Largest-Remainder math — budget allocations sum exactly to the paisa, never hallucinated.' },
-                { icon: '⏳', title: 'IST-Aware Timeline', desc: 'Milestones calculated in Asia/Kolkata timezone. Export RFC 5545 .ics or add directly to Google Calendar.' },
-                { icon: '🤝', title: 'Vendor Questionnaire', desc: 'AI generates 2–4 sharp interview questions per vendor. Includes Police NOC & Municipal permits for community events.' },
-                { icon: '✨', title: 'Gemini Refinement', desc: 'Rewrite any section — food, décor, activities — with a 300-char instruction. Strict event-planning focus, no off-topic drift.' },
+                {
+                  icon: '💰',
+                  title: 'Zero Rupee Drift',
+                  desc: 'Deterministic Largest-Remainder math — budget allocations sum exactly to the paisa, never hallucinated.',
+                },
+                {
+                  icon: '⏳',
+                  title: 'IST-Aware Timeline',
+                  desc: 'Milestones calculated in Asia/Kolkata timezone. Export RFC 5545 .ics or add directly to Google Calendar.',
+                },
+                {
+                  icon: '🤝',
+                  title: 'Vendor Questionnaire',
+                  desc: 'AI generates 2–4 sharp interview questions per vendor. Includes Police NOC & Municipal permits for community events.',
+                },
+                {
+                  icon: '✨',
+                  title: 'Gemini Refinement',
+                  desc: 'Rewrite any section — food, décor, activities — with a 300-char instruction. Strict event-planning focus, no off-topic drift.',
+                },
               ].map((f) => (
-                <div key={f.title} role="listitem" style={{
-                  background: 'var(--surface-card)',
-                  border: '1px solid var(--surface-border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '1.1rem',
-                  boxShadow: 'var(--surface-shadow)',
-                }}>
+                <div
+                  key={f.title}
+                  role="listitem"
+                  style={{
+                    background: 'var(--surface-card)',
+                    border: '1px solid var(--surface-border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.1rem',
+                    boxShadow: 'var(--surface-shadow)',
+                  }}
+                >
                   <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>{f.icon}</div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-main)' }}>{f.title}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>{f.desc}</div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      marginBottom: '0.25rem',
+                      color: 'var(--text-main)',
+                    }}
+                  >
+                    {f.title}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                    {f.desc}
+                  </div>
                 </div>
               ))}
             </div>
@@ -230,30 +322,94 @@ const MainPlanner: React.FC = () => {
                 boxShadow: 'var(--surface-shadow)',
               }}
             >
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.1rem', color: 'var(--text-main)', textAlign: 'center' }}>
+              <h2
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  marginBottom: '1.1rem',
+                  color: 'var(--text-main)',
+                  textAlign: 'center',
+                }}
+              >
                 🪄 How it works — 5 steps in under 2 minutes
               </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  textAlign: 'left',
+                }}
+              >
                 {[
-                  { step: '1', label: 'Pick your event type', detail: 'Wedding, Birthday, or Community Festival — select sub-events like Haldi, Sangeet, Mehendi.' },
-                  { step: '2', label: 'Add date, city & guest count', detail: 'Utsav tailors vendor deadlines and permits to your Indian city and timeline.' },
-                  { step: '3', label: 'Set your budget', detail: 'Use presets (₹5L–₹60L for weddings) or type any amount. Rupee math is done in TypeScript — never by AI.' },
-                  { step: '4', label: 'Describe your vibe', detail: 'Theme, dietary preferences, cultural notes, and language (English or Hindi).' },
-                  { step: '5', label: 'Gemini generates your full plan', detail: 'Budget breakdown, timeline milestones, vendor checklist, and 5+ personalized ideas — all in one click.' },
+                  {
+                    step: '1',
+                    label: 'Pick your event type',
+                    detail:
+                      'Wedding, Birthday, or Community Festival — select sub-events like Haldi, Sangeet, Mehendi.',
+                  },
+                  {
+                    step: '2',
+                    label: 'Add date, city & guest count',
+                    detail:
+                      'Utsav tailors vendor deadlines and permits to your Indian city and timeline.',
+                  },
+                  {
+                    step: '3',
+                    label: 'Set your budget',
+                    detail:
+                      'Use presets (₹5L–₹60L for weddings) or type any amount. Rupee math is done in TypeScript — never by AI.',
+                  },
+                  {
+                    step: '4',
+                    label: 'Describe your vibe',
+                    detail:
+                      'Theme, dietary preferences, cultural notes, and language (English or Hindi).',
+                  },
+                  {
+                    step: '5',
+                    label: 'Gemini generates your full plan',
+                    detail:
+                      'Budget breakdown, timeline milestones, vendor checklist, and 5+ personalized ideas — all in one click.',
+                  },
                 ].map((s) => (
-                  <div key={s.step} style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
-                    <div style={{
-                      width: '26px', height: '26px', minWidth: '26px',
-                      borderRadius: 'var(--radius-full)',
-                      background: 'linear-gradient(135deg, var(--primary-saffron), var(--primary-magenta))',
-                      color: '#fff',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>{s.step}</div>
+                  <div
+                    key={s.step}
+                    style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}
+                  >
+                    <div
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        minWidth: '26px',
+                        borderRadius: 'var(--radius-full)',
+                        background:
+                          'linear-gradient(135deg, var(--primary-saffron), var(--primary-magenta))',
+                        color: '#fff',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {s.step}
+                    </div>
                     <div>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>{s.label}</span>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>{s.detail}</span>
+                      <span
+                        style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}
+                      >
+                        {s.label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.82rem',
+                          color: 'var(--text-muted)',
+                          marginLeft: '0.4rem',
+                        }}
+                      >
+                        {s.detail}
+                      </span>
                     </div>
                   </div>
                 ))}

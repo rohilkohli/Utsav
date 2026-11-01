@@ -9,148 +9,9 @@ interface VendorsTabProps {
   city: string;
   onUpdateVendor: (id: string, updates: Partial<Vendor>) => void;
 }
-
-function StarRating({ rating }: { rating: number }) {
-  const full = Math.floor(rating);
-  const half = rating - full >= 0.5;
-  return (
-    <span style={{ color: '#f59e0b', fontSize: '0.8rem', letterSpacing: '1px' }}>
-      {'★'.repeat(full)}
-      {half ? '½' : ''}
-      {'☆'.repeat(5 - full - (half ? 1 : 0))}
-      <span style={{ color: 'var(--text-muted)', fontWeight: 600, marginLeft: '0.25rem' }}>
-        {rating.toFixed(1)}
-      </span>
-    </span>
-  );
-}
-
-function VendorResultCard({
-  s,
-  onLink,
-}: {
-  s: VendorSuggestion;
-  onLink: (s: VendorSuggestion) => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const copyPhone = () => {
-    if (!s.phone) return;
-    navigator.clipboard.writeText(s.phone).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-
-  return (
-    <div
-      style={{
-        background: 'var(--surface-card)',
-        border: '1px solid var(--surface-border)',
-        borderRadius: 'var(--radius-md)',
-        padding: '0.85rem 1rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.4rem',
-      }}
-    >
-      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
-        {s.name}
-      </div>
-
-      {s.rating !== undefined && <StarRating rating={s.rating} />}
-
-      {s.address && (
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-          📍 {s.address}
-        </div>
-      )}
-
-      {s.phone && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-            📞 {s.phone}
-          </span>
-          <button
-            type="button"
-            onClick={copyPhone}
-            title="Copy phone number"
-            style={{
-              fontSize: '0.7rem',
-              padding: '0.15rem 0.5rem',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--surface-border)',
-              background: copied ? 'var(--success-bg)' : 'var(--surface-card-hover)',
-              color: copied ? 'var(--success-text)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            {copied ? '✓ Copied' : 'Copy'}
-          </button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-        {s.mapsUrl && (
-          <a
-            href={s.mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.2rem 0.65rem',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid rgba(66,133,244,0.3)',
-              background: 'rgba(66,133,244,0.07)',
-              color: '#4285f4',
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
-          >
-            🗺️ Open in Maps
-          </a>
-        )}
-        {s.website && (
-          <a
-            href={s.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.2rem 0.65rem',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--surface-border)',
-              background: 'var(--surface-card-hover)',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
-          >
-            🌐 Website
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={() => onLink(s)}
-          title={`Use ${s.name} as this vendor`}
-          style={{
-            fontSize: '0.75rem',
-            padding: '0.2rem 0.65rem',
-            borderRadius: 'var(--radius-full)',
-            border: '1px solid rgba(230,81,0,0.3)',
-            background: 'rgba(230,81,0,0.07)',
-            color: 'var(--primary-saffron)',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          + Use This Vendor
-        </button>
-      </div>
-    </div>
-  );
-}
+import { QuoteAnalyzer } from './QuoteAnalyzer';
+import { QuoteComparison } from './QuoteComparison';
+import { VendorPlaceSearch } from './VendorPlaceSearch';
 
 export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateVendor }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -236,9 +97,19 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
           </span>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {[
-              { label: 'To Contact', count: toContact, color: 'var(--text-muted)', bg: 'rgba(0,0,0,0.06)' },
+              {
+                label: 'To Contact',
+                count: toContact,
+                color: 'var(--text-muted)',
+                bg: 'rgba(0,0,0,0.06)',
+              },
               { label: 'Quoted', count: quoted, color: '#b45309', bg: 'rgba(255,179,0,0.15)' },
-              { label: '✓ Booked', count: booked, color: 'var(--success-text)', bg: 'var(--success-bg)' },
+              {
+                label: '✓ Booked',
+                count: booked,
+                color: 'var(--success-text)',
+                bg: 'var(--success-bg)',
+              },
             ].map((stage) => (
               <div
                 key={stage.label}
@@ -309,9 +180,9 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
       >
         <span style={{ fontSize: '1.2rem' }}>🗺️</span>
         <span>
-          <strong>Real Vendor Search:</strong> Each card has a{' '}
-          <strong>Find Real Vendors</strong> button — it searches Google Maps for actual{' '}
-          {city} businesses matching that category, with phone numbers and ratings.
+          <strong>Real Vendor Search:</strong> Each card has a <strong>Find Real Vendors</strong>{' '}
+          button — it searches Google Maps for actual {city} businesses matching that category, with
+          phone numbers and ratings.
           {!city && ' Add your city in the plan to enable this feature.'}
         </span>
       </div>
@@ -481,7 +352,7 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
                       value={vendor.quotedAmount ? formatINR(vendor.quotedAmount) : ''}
                       onChange={(e) => {
                         const parsed = parseINR(e.target.value);
-                        onUpdateVendor(vendor.id, { quotedAmount: parsed });
+                        if (parsed !== null) onUpdateVendor(vendor.id, { quotedAmount: parsed });
                       }}
                       style={{
                         width: '100%',
@@ -495,6 +366,16 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
                     />
                   </div>
                 </div>
+
+                <QuoteComparison vendor={vendor} />
+
+                <QuoteAnalyzer
+                  vendorId={vendor.id}
+                  vendorName={vendor.category}
+                  category={vendor.category}
+                  budgetedAmount={vendor.budgetedAmount}
+                  onAccept={(amount) => onUpdateVendor(vendor.id, { quotedAmount: amount, status: 'booked' })}
+                />
 
                 {/* Questions to Ask */}
                 <div style={{ marginBottom: '0.75rem' }}>
@@ -541,9 +422,7 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
                   border: isExpanded
                     ? '1px solid rgba(66,133,244,0.4)'
                     : '1px dashed rgba(66,133,244,0.4)',
-                  background: isExpanded
-                    ? 'rgba(66,133,244,0.1)'
-                    : 'rgba(66,133,244,0.04)',
+                  background: isExpanded ? 'rgba(66,133,244,0.1)' : 'rgba(66,133,244,0.04)',
                   color: '#4285f4',
                   fontWeight: 700,
                   fontSize: '0.85rem',
@@ -624,13 +503,10 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
                         </span>{' '}
                         from Google Maps · Click <strong>+ Use This Vendor</strong> to link one.
                       </div>
-                      {vendorResults.map((s, idx) => (
-                        <VendorResultCard
-                          key={idx}
-                          s={s}
-                          onLink={(suggestion) => handleLinkVendor(vendor.id, suggestion)}
-                        />
-                      ))}
+                      <VendorPlaceSearch
+                        suggestions={vendorResults}
+                        onLink={(suggestion) => handleLinkVendor(vendor.id, suggestion)}
+                      />
                     </>
                   )}
                 </div>
@@ -640,9 +516,6 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ vendors, city, onUpdateV
         })}
       </div>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 };

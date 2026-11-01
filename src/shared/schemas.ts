@@ -92,6 +92,9 @@ export const rawMilestoneSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   daysBeforeEvent: z.number().int(),
+  durationDays: z.number().int().positive().default(3),
+  dependsOn: z.array(z.string()).default([]),
+  assignee: z.string().optional(),
   subEvent: z.string().optional(),
 });
 
@@ -127,6 +130,8 @@ export const budgetCategorySchema = z.object({
   suggestedPercent: z.number(),
   amount: z.number().int(),
   actual: z.number().int(),
+  locked: z.boolean().default(false),
+  verified: z.boolean().default(false),
   subEvent: z.string().optional(),
 });
 export type BudgetCategory = z.infer<typeof budgetCategorySchema>;
@@ -137,10 +142,19 @@ export const milestoneSchema = z.object({
   description: z.string(),
   daysBeforeEvent: z.number().int(),
   date: z.string(), // YYYY-MM-DD
+  durationDays: z.number().int().positive().default(3),
+  dependsOn: z.array(z.string()).default([]),
+  status: z.enum(['todo', 'done', 'delayed']).default('todo'),
+  delayDays: z.number().int().nonnegative().optional(),
+  assignee: z.string().optional(),
   subEvent: z.string().optional(),
   completed: z.boolean().default(false),
 });
-export type Milestone = z.infer<typeof milestoneSchema>;
+export type Milestone = Omit<z.infer<typeof milestoneSchema>, 'durationDays' | 'dependsOn' | 'status'> & {
+  durationDays?: number;
+  dependsOn?: string[];
+  status?: 'todo' | 'done' | 'delayed';
+};
 
 export const vendorSchema = z.object({
   id: z.string(),
@@ -167,6 +181,7 @@ export type Idea = z.infer<typeof ideaSchema>;
 
 export const planOutputSchema = z.object({
   summary: z.string(),
+  perPlate: z.number().int().nonnegative().optional(),
   budget: z.array(budgetCategorySchema),
   timeline: z.array(milestoneSchema),
   vendors: z.array(vendorSchema),
@@ -239,6 +254,56 @@ export const refineSectionResponseSchema = z.object({
   meta: planMetaSchema,
 });
 export type RefineSectionResponse = z.infer<typeof refineSectionResponseSchema>;
+
+export const planReviewSchema = z.object({
+  strengths: z.array(z.string().min(1)).min(1),
+  risks: z.array(z.string().min(1)).min(1),
+  suggestions: z.array(z.string().min(1)).min(1),
+  overallScore: z.number().int().min(1).max(10),
+});
+export type PlanReview = z.infer<typeof planReviewSchema>;
+
+export const planReviewResponseSchema = z.object({
+  review: planReviewSchema,
+  meta: z.object({ source: z.enum(['gemini', 'fallback']) }),
+});
+
+export const askPlannerRequestSchema = z.object({
+  question: z.string().trim().min(1).max(500),
+  plan: planOutputSchema,
+  input: wizardInputSchema,
+});
+export type AskPlannerRequest = z.infer<typeof askPlannerRequestSchema>;
+
+export const askPlannerResponseSchema = z.object({
+  answer: z.string(),
+  source: z.enum(['gemini', 'fallback']),
+});
+export type AskPlannerResponse = z.infer<typeof askPlannerResponseSchema>;
+
+export const parseIntakeRequestSchema = z.object({
+  description: z.string().trim().min(1).max(1000),
+});
+
+export const parseIntakeResponseSchema = z.object({
+  input: wizardInputSchema,
+  source: z.enum(['gemini', 'fallback']),
+});
+
+export const explainTradeoffsRequestSchema = z.object({
+  overBudgetAmount: z.number().int().nonnegative(),
+  options: z.array(z.object({
+    label: z.string().max(200),
+    description: z.string().max(500),
+    savings: z.number().int().nonnegative(),
+    newTotal: z.number().int().nonnegative(),
+  })).max(3),
+});
+
+export const explainTradeoffsResponseSchema = z.object({
+  explanation: z.string(),
+  source: z.enum(['gemini', 'fallback']),
+});
 
 // ─── Runtime Firebase Config Schema ───────────────────────────
 export const publicConfigSchema = z.object({

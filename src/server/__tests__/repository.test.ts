@@ -77,7 +77,7 @@ describe('Repository Pattern & Storage Backends', () => {
 
     const samplePlan: PlanOutput = {
       summary: 'Retro Disco Birthday',
-      budget: [{ id: '1', category: 'Music', suggestedPercent: 100, amount: 20000, actual: 20000 }],
+      budget: [{ id: '1', category: 'Music', suggestedPercent: 100, amount: 20000, actual: 20000, locked: false, verified: false }],
       timeline: [],
       vendors: [],
       ideas: [],

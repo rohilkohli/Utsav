@@ -4,7 +4,29 @@ export interface CalendarEvent {
   title: string;
   description: string;
   dateStr: string; // YYYY-MM-DD
+  effectiveDate?: string; // Delay-adjusted date, when scheduling has propagated delays
   location?: string;
+}
+
+/** Fold a content line to the RFC 5545 maximum of 75 UTF-8 octets. */
+export function foldLine(line: string): string[] {
+  const chunks: string[] = [];
+  let chunk = '';
+  let octets = 0;
+  const encoder = new TextEncoder();
+  for (const character of line) {
+    const size = encoder.encode(character).length;
+    const limit = chunks.length === 0 ? 75 : 74;
+    if (chunk && octets + size > limit) {
+      chunks.push(chunk);
+      chunk = ' ';
+      octets = 1;
+    }
+    chunk += character;
+    octets += size;
+  }
+  chunks.push(chunk);
+  return chunks;
 }
 
 /**
@@ -41,11 +63,12 @@ export function generateICS(events: CalendarEvent[]): string {
   ];
 
   for (let i = 0; i < events.length; i++) {
-    const e = events[i];
+    const e = events[i]!;
     const uid = `utsav-${i}-${toICSDate(e.dateStr)}-${Math.random().toString(36).slice(2, 8)}@utsav.app`;
-    const startDate = toICSDate(e.dateStr);
+    const eventDate = e.effectiveDate ?? e.dateStr;
+    const startDate = toICSDate(eventDate);
     // All-day events in RFC 5545 specify DTEND as the next day (exclusive)
-    const nextDay = addDaysToDateOnly(e.dateStr, 1);
+    const nextDay = addDaysToDateOnly(eventDate, 1);
     const endDate = toICSDate(nextDay);
 
     lines.push(
@@ -67,8 +90,8 @@ export function generateICS(events: CalendarEvent[]): string {
 
   lines.push('END:VCALENDAR');
 
-  // RFC 5545 requires CRLF line terminators
-  return lines.join('\r\n') + '\r\n';
+  // RFC 5545 requires CRLF line terminators and folded content lines.
+  return lines.flatMap(foldLine).join('\r\n') + '\r\n';
 }
 
 /**
@@ -76,8 +99,9 @@ export function generateICS(events: CalendarEvent[]): string {
  * All-day events use YYYYMMDD/YYYYMMDD where the end date is exclusive (day + 1).
  */
 export function createGoogleCalendarUrl(event: CalendarEvent): string {
-  const startDate = toICSDate(event.dateStr);
-  const nextDay = addDaysToDateOnly(event.dateStr, 1);
+  const eventDate = event.effectiveDate ?? event.dateStr;
+  const startDate = toICSDate(eventDate);
+  const nextDay = addDaysToDateOnly(eventDate, 1);
   const endDate = toICSDate(nextDay);
 
   const params = new URLSearchParams({

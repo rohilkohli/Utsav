@@ -1,15 +1,19 @@
 import express from 'express';
+import { createServer } from 'http';
 import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { securityHeaders } from './middleware/security.js';
+import { sameOriginGuard, securityHeaders } from './middleware/security.js';
 import configRoutes from './routes/config.js';
 import planRoutes from './routes/plan.js';
 import refineRoutes from './routes/refine.js';
 import reviewRoutes from './routes/review.js';
 import shareRoutes from './routes/share.js';
 import vendorRoutes from './routes/vendors.js';
-import voiceRoutes from './routes/voice.js';
+import voiceRoutes, { attachVoiceWebSocket } from './routes/voice.js';
+import askPlannerRoutes from './routes/askPlanner.js';
+import parseIntakeRoutes from './routes/parseIntake.js';
+import explainTradeoffsRoutes from './routes/explainTradeoffs.js';
 import { validateEnv } from './env.js';
 import { initRepositories } from './repositories/index.js';
 
@@ -27,6 +31,7 @@ export function createApp(): express.Application {
 
   // Security headers with CSP & COOP
   app.use(securityHeaders);
+  app.use('/api', sameOriginGuard);
 
   // Note: Per-route express.json() parsers are mounted directly on POST/PUT endpoints
   // to ensure generationLimiter executes BEFORE body parsing/validation on AI endpoints.
@@ -44,6 +49,9 @@ export function createApp(): express.Application {
   app.use('/api', shareRoutes);
   app.use('/api', vendorRoutes);
   app.use('/api', voiceRoutes);
+  app.use('/api', askPlannerRoutes);
+  app.use('/api', parseIntakeRoutes);
+  app.use('/api', explainTradeoffsRoutes);
 
   // In production or when client is built, serve client assets
   const clientDist = path.resolve(__dirname, '../client');
@@ -94,7 +102,9 @@ if (process.env.NODE_ENV !== 'test') {
     process.exit(1);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = createServer(app);
+  attachVoiceWebSocket(server);
+  server.listen(PORT, '0.0.0.0', () => {
     process.stdout.write(`🎉 Utsav server running on port ${PORT}\n`);
   });
 }

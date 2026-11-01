@@ -43,7 +43,7 @@ export const BudgetStep: React.FC<BudgetStepProps> = ({
             placeholder="₹0"
             onChange={(e) => {
               const parsed = parseINR(e.target.value);
-              onChangeBudget(parsed);
+              if (parsed !== null) onChangeBudget(parsed);
             }}
             style={{
               width: '100%',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { PlanOutput, WizardInput, BudgetCategory, Vendor, Idea } from '@shared/schemas';
 import { BudgetTab } from './BudgetTab';
 import { TimelineTab } from './TimelineTab';
@@ -7,8 +7,11 @@ import { IdeasTab } from './IdeasTab';
 import { RunSheetTab } from './RunSheetTab';
 import { ShareModal } from '../shared/ShareModal';
 import { useAuth } from '../../hooks/useAuth.js';
-import { calculateBudgetTotals } from '@shared/budget';
+import { calculateBudgetTotals, scaleGuests } from '@shared/budget';
 import { suggestTradeoffs } from '@shared/tradeoffs';
+import { AssistantPanel } from './AssistantPanel';
+import { PrintSummary } from './PrintSummary';
+import { apiExplainTradeoffs } from '../../lib/api';
 
 interface DashboardShellProps {
   input: WizardInput;
@@ -16,7 +19,7 @@ interface DashboardShellProps {
   isFallback?: boolean;
   activeTab?: TabType;
   onTabChange?: (tab: TabType) => void;
-  onUpdatePlan: (updated: PlanOutput, newBudget?: number) => void;
+  onUpdatePlan: (updated: PlanOutput, newBudget?: number, newGuestCount?: number) => void;
   onNewPlan: () => void;
 }
 
@@ -34,11 +37,21 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   const [internalTab, setInternalTab] = useState<TabType>('budget');
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = (t: TabType) => { setInternalTab(t); onTabChange?.(t); };
+  const tabRefs = useRef<Partial<Record<TabType, HTMLButtonElement>>>({});
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [tradeoffExplanation, setTradeoffExplanation] = useState<string | null>(null);
   const { user, login } = useAuth();
 
   const handleUpdateCategories = (categories: BudgetCategory[], newTotalBudget?: number) => {
     onUpdatePlan({ ...plan, budget: categories }, newTotalBudget);
+  };
+
+  const handleGuestCount = (guestCount: number) => {
+    onUpdatePlan(scaleGuests(plan, guestCount).plan, undefined, guestCount);
+  };
+
+  const handlePerPlate = (perPlate: number) => {
+    onUpdatePlan(scaleGuests(plan, input.guestCount, perPlate).plan);
   };
 
   const handleToggleMilestone = (id: string) => {
@@ -67,6 +80,21 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
     { id: 'ideas', label: 'Personalized Ideas', icon: '✨' },
     { id: 'runsheet', label: 'Day-of Run Sheet', icon: '📋' },
   ];
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, tab: TabType) => {
+    const index = tabs.findIndex((item) => item.id === tab);
+    let nextIndex = index;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = tabs.length - 1;
+    if (nextIndex === index) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex]?.id;
+    if (!nextTab) return;
+    setActiveTab(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  };
 
   return (
     <div className="container" style={{ padding: '2rem 1.25rem' }}>
@@ -158,6 +186,24 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="tradeoff-explain-button"
+            onClick={() => {
+              void apiExplainTradeoffs(
+                budgetTotals.overBudgetAmount,
+                tradeoffs.map((option) => ({
+                  label: option.label,
+                  description: option.description,
+                  savings: option.savings,
+                  newTotal: option.newTotal,
+                })),
+              ).then((response) => setTradeoffExplanation(response.explanation));
+            }}
+          >
+            Explain these options
+          </button>
+          {tradeoffExplanation && <p className="tradeoff-explanation" role="status">{tradeoffExplanation}</p>}
         </div>
       )}
 
@@ -184,6 +230,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           </span>
         </div>
       )}
+
+      <AssistantPanel plan={plan} input={input} onNavigate={setActiveTab} />
+      <button type="button" className="print-button" onClick={() => window.print()}>
+        Print summary
+      </button>
 
       {/* Plan Header Card */}
       <div
@@ -303,6 +354,10 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
               aria-controls={`panel-${t.id}`}
               tabIndex={isSelected ? 0 : -1}
               onClick={() => setActiveTab(t.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, t.id)}
+              ref={(element) => {
+                if (element) tabRefs.current[t.id] = element;
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -344,7 +399,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
                 <BudgetTab
                   categories={plan.budget}
                   totalBudget={input.totalBudget}
+                  guestCount={input.guestCount}
+                  perPlate={plan.perPlate ?? 0}
                   onUpdateCategories={handleUpdateCategories}
+                  onUpdateGuestCount={handleGuestCount}
+                  onUpdatePerPlate={handlePerPlate}
                 />
               )}
               {t.id === 'timeline' && (
@@ -376,6 +435,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           )}
         </div>
       ))}
+
+      <PrintSummary plan={plan} input={input} />
 
       {/* Share Modal */}
       <ShareModal

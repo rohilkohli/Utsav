@@ -47,7 +47,7 @@ describe('Gemini Service & Prompts Branches', () => {
   it('builds prompts covering both empty and specified optional fields', () => {
     const promptFull = buildPlanPrompt(weddingInput);
     expect(promptFull).toContain('Indian Wedding');
-    expect(promptFull).toContain('Dietary Constraints: Pure Vegetarian');
+    expect(promptFull).toContain('Dietary Constraints: <user_text>\nPure Vegetarian');
 
     const promptMinimal = buildPlanPrompt(birthdayMinimal);
     expect(promptMinimal).toContain('Birthday / Milestone');

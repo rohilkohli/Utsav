@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 import { nanoid } from 'nanoid';
 import {
@@ -11,10 +12,12 @@ import {
   geminiRefineOutputSchema,
   getGeminiPlanJsonSchema,
   getGeminiRefineJsonSchema,
+  planReviewSchema,
+  type PlanReview,
 } from '../../shared/schemas.js';
-import { populateCategoryAmounts } from '../../shared/budget.js';
+import { ensureContingencyCategory, populateCategoryAmounts } from '../../shared/budget.js';
 import { computeMilestoneDate } from '../../shared/timeline.js';
-import { SYSTEM_INSTRUCTION, buildPlanPrompt, buildRefinePrompt } from '../prompts/plan.js';
+import { SYSTEM_INSTRUCTION, buildPlanPrompt, buildRefinePrompt, wrapUserText } from '../prompts/plan.js';
 import { createPlanCacheKey, getCachedPlan, setCachedPlan } from './cache.js';
 import { sanitizeObject } from '../lib/sanitize.js';
 import { generateFallbackPlan } from './fallback.js';
@@ -101,7 +104,7 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
     subEvent: b.subEvent,
   }));
 
-  const enrichedBudget = populateCategoryAmounts(categoriesWithIds, input.totalBudget);
+  const enrichedBudget = populateCategoryAmounts(ensureContingencyCategory(categoriesWithIds), input.totalBudget);
 
   const enrichedTimeline = raw.timeline.map((m) => ({
     id: nanoid(),
@@ -109,6 +112,10 @@ export function enrichRawPlan(raw: GeminiRawPlan, input: WizardInput): PlanOutpu
     description: m.description,
     daysBeforeEvent: m.daysBeforeEvent,
     date: computeMilestoneDate(input.eventDate, m.daysBeforeEvent),
+    durationDays: m.durationDays,
+    dependsOn: m.dependsOn,
+    assignee: m.assignee,
+    status: 'todo' as const,
     subEvent: m.subEvent,
     completed: false,
   }));
@@ -209,15 +216,6 @@ export async function generateEventPlan(
   return { plan: generateFallbackPlan(input), source: 'fallback' };
 }
 
-/** Structured AI review returned by {@link reviewPlan}. */
-export interface PlanReview {
-  strengths: string[];
-  risks: string[];
-  suggestions: string[];
-  /** Overall plan health score from 1 (poor) to 10 (excellent). */
-  overallScore: number;
-}
-
 /**
  * Builds a heuristic plan review without calling Gemini.
  * Used when the API key is absent or all Gemini attempts fail.
@@ -270,10 +268,10 @@ export async function reviewPlan(
 
   const prompt = `You are Utsav, an expert Indian event planner. Review this celebration plan and give honest feedback.
 
-EVENT: ${input.eventType} in ${input.city} for ${input.guestCount} guests on ${input.eventDate}
+EVENT: ${wrapUserText(input.eventType)} in ${wrapUserText(input.city)} for ${input.guestCount} guests on ${input.eventDate}
 BUDGET: ₹${input.totalBudget.toLocaleString('en-IN')}
-PLAN SUMMARY: ${plan.summary}
-BUDGET CATEGORIES: ${plan.budget.map((b) => `${b.category} (₹${b.amount.toLocaleString('en-IN')})`).join(', ')}
+PLAN SUMMARY: ${wrapUserText(plan.summary)}
+BUDGET CATEGORIES: ${plan.budget.map((b) => `${wrapUserText(b.category)} (₹${b.amount.toLocaleString('en-IN')})`).join(', ')}
 VENDOR COUNT: ${plan.vendors.length} categories
 MILESTONE COUNT: ${plan.timeline.length}
 
@@ -288,20 +286,13 @@ Respond with JSON: { "strengths": [3 strings], "risks": [2-3 strings], "suggesti
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             responseMimeType: 'application/json',
+            responseJsonSchema: z.toJSONSchema(planReviewSchema),
             temperature: 0.5,
           },
         }),
         20_000,
       );
-      const parsed = sanitizeObject(JSON.parse(response.text || '')) as PlanReview;
-      if (
-        !Array.isArray(parsed.strengths) ||
-        !Array.isArray(parsed.risks) ||
-        !Array.isArray(parsed.suggestions)
-      ) {
-        throw new Error('Invalid review structure from Gemini');
-      }
-      return parsed;
+      return planReviewSchema.parse(sanitizeObject(JSON.parse(response.text || '')));
     },
     '[Review Plan]',
     2,

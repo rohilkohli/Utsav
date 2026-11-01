@@ -6,7 +6,7 @@
  */
 import { nanoid } from 'nanoid';
 import type { WizardInput, PlanOutput, Idea } from '../../shared/schemas.js';
-import { populateCategoryAmounts } from '../../shared/budget.js';
+import { ensureContingencyCategory, populateCategoryAmounts } from '../../shared/budget.js';
 import { computeMilestoneDate } from '../../shared/timeline.js';
 
 /**
@@ -46,7 +46,7 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
           { id: nanoid(), category: 'Return Gifts & Mementos', suggestedPercent: 10 },
         ];
 
-  const enrichedBudget = populateCategoryAmounts(defaultCategories, input.totalBudget);
+  const enrichedBudget = populateCategoryAmounts(ensureContingencyCategory(defaultCategories), input.totalBudget);
 
   const defaultMilestones = isWedding
     ? [
@@ -66,6 +66,13 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
           { id: nanoid(), title: 'Order Custom Cake & Treats', description: 'Pick flavor and custom topper design', daysBeforeEvent: 7, date: computeMilestoneDate(input.eventDate, 7), completed: false },
           { id: nanoid(), title: 'Birthday Celebration Day!', description: 'Enjoy the party with family and friends', daysBeforeEvent: 0, date: input.eventDate, completed: false },
         ];
+
+  const normalizedMilestones = defaultMilestones.map((milestone) => ({
+    ...milestone,
+    durationDays: 3,
+    dependsOn: [],
+    status: 'todo' as const,
+  }));
 
   const defaultVendors = isCommunity
     ? [
@@ -126,7 +133,7 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
   return {
     summary: `A vibrant ${input.eventType} celebration designed for ${input.guestCount} guests in ${input.city}, bringing memorable cultural hospitality within your ₹${input.totalBudget.toLocaleString('en-IN')} budget.`,
     budget: enrichedBudget,
-    timeline: defaultMilestones,
+    timeline: normalizedMilestones,
     vendors: defaultVendors,
     ideas: defaultIdeas,
   };

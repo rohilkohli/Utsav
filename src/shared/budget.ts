@@ -1,8 +1,34 @@
-import type { BudgetCategory, EventType } from './schemas.js';
+import type { BudgetCategory, EventType, PlanOutput } from './schemas.js';
 
 export interface BudgetPreset {
   label: string;
   value: number;
+}
+
+export interface BudgetCategoryInput {
+  id: string;
+  category: string;
+  suggestedPercent: number;
+  actual?: number;
+  subEvent?: string;
+}
+
+/** Ensure generated plans reserve 10% for an explicit contingency buffer. */
+export function ensureContingencyCategory<T extends BudgetCategoryInput>(categories: T[]): T[] {
+  if (categories.some((category) => category.category.toLowerCase().includes('contingency'))) {
+    return categories;
+  }
+  return [
+    ...categories.map((category) => ({
+      ...category,
+      suggestedPercent: category.suggestedPercent * 0.9,
+    })),
+    {
+      id: 'contingency-buffer',
+      category: 'Contingency Buffer',
+      suggestedPercent: 10,
+    } as T,
+  ];
 }
 
 export const BUDGET_PRESETS: Record<EventType, BudgetPreset[]> = {
@@ -57,7 +83,7 @@ export function allocateAmountsByLargestRemainder(
   const exactShares = effectivePercents.map((p) => p * totalBudget);
   const integerParts = exactShares.map((s) => Math.floor(s));
   const remainders = exactShares.map((s, idx) => ({
-    remainder: s - integerParts[idx],
+    remainder: s - (integerParts[idx] ?? 0),
     index: idx,
   }));
 
@@ -70,7 +96,8 @@ export function allocateAmountsByLargestRemainder(
   const result = [...integerParts];
 
   for (let i = 0; i < remainders.length && discrepancy > 0; i++) {
-    result[remainders[i].index] += 1;
+    const remainder = remainders[i]!;
+    result[remainder.index] = (result[remainder.index] ?? 0) + 1;
     discrepancy--;
   }
 
@@ -87,13 +114,7 @@ export function allocateAmountsByLargestRemainder(
  * @returns Fully populated BudgetCategory array with normalized percents and exact rupee amounts
  */
 export function populateCategoryAmounts(
-  categories: Array<{
-    id: string;
-    category: string;
-    suggestedPercent: number;
-    actual?: number;
-    subEvent?: string;
-  }>,
+  categories: BudgetCategoryInput[],
   totalBudget: number,
 ): BudgetCategory[] {
   const rawSum = categories.reduce((sum, c) => sum + Math.max(0, c.suggestedPercent), 0);
@@ -108,13 +129,111 @@ export function populateCategoryAmounts(
   );
 
   return categories.map((c, idx) => ({
+    ...(() => {
+      const amount = amounts[idx] ?? 0;
+      return {
+        suggestedPercent: normalizedPercents[idx] ?? 0,
+        amount,
+        actual: c.actual !== undefined ? c.actual : amount,
+      };
+    })(),
     id: c.id,
     category: c.category,
-    suggestedPercent: normalizedPercents[idx],
-    amount: amounts[idx],
-    actual: c.actual !== undefined ? c.actual : amounts[idx],
+    locked: false,
+    verified: false,
     subEvent: c.subEvent,
   }));
+}
+
+export interface BudgetChange {
+  id: string;
+  category: string;
+  delta: number;
+}
+
+export interface RedistributionResult {
+  categories: BudgetCategory[];
+  changes: BudgetChange[];
+}
+
+export interface GuestScaleResult {
+  plan: PlanOutput;
+  requiredCatering: number;
+  budgetedCatering: number;
+  shortfall: number;
+}
+
+export function scaleGuests(plan: PlanOutput, newGuestCount: number, perPlate = plan.perPlate ?? 0): GuestScaleResult {
+  const guests = Math.max(0, Math.round(newGuestCount));
+  const rate = Math.max(0, Math.round(perPlate));
+  const catering = plan.budget.find((category) => /cater|food|prasad/i.test(category.category));
+  const requiredCatering = guests * rate;
+  const budgetedCatering = catering?.amount ?? 0;
+  const updatedBudget = catering
+    ? plan.budget.map((category) => category.id === catering.id ? { ...category, actual: requiredCatering } : category)
+    : plan.budget;
+  return {
+    plan: { ...plan, perPlate: rate, budget: updatedBudget },
+    requiredCatering,
+    budgetedCatering,
+    shortfall: Math.max(0, requiredCatering - budgetedCatering),
+  };
+}
+
+/**
+ * Move a category allocation while keeping the plan total exact. The delta is
+ * spread across unlocked peers using largest-remainder rounding.
+ */
+export function redistribute(
+  categories: BudgetCategory[],
+  categoryId: string,
+  newAmount: number,
+): RedistributionResult {
+  const targetIndex = categories.findIndex((category) => category.id === categoryId);
+  if (targetIndex < 0 || categories.length === 0) return { categories, changes: [] };
+
+  const target = categories[targetIndex]!;
+  const unlockedPeers = categories.filter(
+    (category, index) => index !== targetIndex && !category.locked,
+  );
+  if (target.locked || unlockedPeers.length === 0) return { categories, changes: [] };
+
+  const currentAmount = target.amount;
+  const requestedDelta = Math.round(newAmount) - currentAmount;
+  const available =
+    requestedDelta > 0
+      ? unlockedPeers.reduce((sum, category) => sum + category.amount, 0)
+      : Number.POSITIVE_INFINITY;
+  const delta = requestedDelta > 0 ? Math.min(requestedDelta, available) : requestedDelta;
+  if (delta === 0) return { categories, changes: [] };
+
+  const peerTotal = unlockedPeers.reduce((sum, category) => sum + category.amount, 0);
+  const peerAmounts = allocateAmountsByLargestRemainder(
+    unlockedPeers.map((category) => ({
+      suggestedPercent: peerTotal > 0 ? category.amount / peerTotal : 1,
+    })),
+    Math.max(0, peerTotal - delta),
+  );
+  let peerIndex = 0;
+  const updated = categories.map((category, index) => {
+    if (index === targetIndex) return { ...category, amount: currentAmount + delta };
+    if (category.locked) return category;
+    const amount = peerAmounts[peerIndex++] ?? category.amount;
+    return {
+      ...category,
+      amount,
+      actual: category.actual === category.amount ? amount : category.actual,
+    };
+  });
+
+  const changes = updated
+    .map((category, index) => ({
+      id: category.id,
+      category: category.category,
+      delta: category.amount - categories[index]!.amount,
+    }))
+    .filter((change) => change.delta !== 0);
+  return { categories: updated, changes };
 }
 
 export interface BudgetTotals {

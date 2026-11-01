@@ -6,6 +6,16 @@ import type {
   GeneratePlanResponse,
   SavedPlan,
   RefineSectionResponse,
+  AskPlannerResponse,
+  PlanReview,
+} from '../../shared/schemas.js';
+import {
+  askPlannerResponseSchema,
+  generatePlanResponseSchema,
+  planReviewResponseSchema,
+  parseIntakeResponseSchema,
+  explainTradeoffsResponseSchema,
+  refineSectionResponseSchema,
 } from '../../shared/schemas.js';
 
 type ShareResponse = { shareToken: string; shareUrl: string };
@@ -16,7 +26,10 @@ export async function fetchRuntimeConfig(): Promise<PublicConfig> {
   return res.json();
 }
 
-export async function apiGeneratePlan(input: WizardInput, token?: string): Promise<GeneratePlanResponse> {
+export async function apiGeneratePlan(
+  input: WizardInput,
+  token?: string,
+): Promise<GeneratePlanResponse> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -31,7 +44,7 @@ export async function apiGeneratePlan(input: WizardInput, token?: string): Promi
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to generate plan');
   }
-  return res.json();
+  return generatePlanResponseSchema.parse(await res.json());
 }
 
 export async function apiRefineSection(
@@ -54,7 +67,7 @@ export async function apiRefineSection(
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to refine ideas');
   }
-  return res.json();
+  return refineSectionResponseSchema.parse(await res.json());
 }
 
 export async function apiCreateShare(input: WizardInput, plan: PlanOutput): Promise<ShareResponse> {
@@ -89,7 +102,11 @@ export async function apiGetPlan(id: string, token?: string): Promise<SavedPlan>
   return res.json();
 }
 
-export async function apiSavePlan(input: WizardInput, plan: PlanOutput, token: string): Promise<SavedPlan> {
+export async function apiSavePlan(
+  input: WizardInput,
+  plan: PlanOutput,
+  token: string,
+): Promise<SavedPlan> {
   const res = await fetch('/api/plan/save', {
     method: 'POST',
     headers: {
@@ -145,4 +162,58 @@ export async function apiUpdatePlan(plan: SavedPlan, token?: string): Promise<vo
   if (!res.ok) {
     throw new Error('Failed to update plan');
   }
+}
+
+export async function apiAskPlanner(
+  question: string,
+  input: WizardInput,
+  plan: PlanOutput,
+): Promise<AskPlannerResponse> {
+  const res = await fetch('/api/ask-planner', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, input, plan }),
+  });
+  if (!res.ok) throw new Error('Planner assistant unavailable');
+  return askPlannerResponseSchema.parse(await res.json());
+}
+
+export async function apiReviewPlan(
+  input: WizardInput,
+  plan: PlanOutput,
+): Promise<{ review: PlanReview; source: 'gemini' | 'fallback' }> {
+  const res = await fetch('/api/review-plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input, plan }),
+  });
+  if (!res.ok) throw new Error('Plan review unavailable');
+  const data = planReviewResponseSchema.parse(await res.json());
+  return {
+    review: data.review,
+    source: data.meta.source,
+  };
+}
+
+export async function apiParseIntake(description: string): Promise<WizardInput> {
+  const res = await fetch('/api/parse-intake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  });
+  if (!res.ok) throw new Error('Could not parse event description');
+  return parseIntakeResponseSchema.parse(await res.json()).input;
+}
+
+export async function apiExplainTradeoffs(
+  overBudgetAmount: number,
+  options: Array<{ label: string; description: string; savings: number; newTotal: number }>,
+): Promise<{ explanation: string; source: 'gemini' | 'fallback' }> {
+  const res = await fetch('/api/explain-tradeoffs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overBudgetAmount, options }),
+  });
+  if (!res.ok) throw new Error('Tradeoff explanation unavailable');
+  return explainTradeoffsResponseSchema.parse(await res.json());
 }
