@@ -32,12 +32,7 @@ describe('generateFallbackPlan', () => {
   });
 
   it('budget amounts sum to totalBudget for birthday', () => {
-    const input: WizardInput = {
-      ...base,
-      eventType: 'birthday',
-      subEvents: [],
-      totalBudget: 50_000,
-    };
+    const input: WizardInput = { ...base, eventType: 'birthday', subEvents: [], totalBudget: 50_000 };
     const plan = generateFallbackPlan(input);
     const total = plan.budget.reduce((s, c) => s + c.amount, 0);
     expect(total).toBe(50_000);
@@ -91,13 +86,7 @@ describe('generateFallbackPlan', () => {
   });
 
   it('summary mentions guest count for birthday', () => {
-    const input: WizardInput = {
-      ...base,
-      eventType: 'birthday',
-      subEvents: [],
-      city: 'Mumbai',
-      guestCount: 30,
-    };
+    const input: WizardInput = { ...base, eventType: 'birthday', subEvents: [], city: 'Mumbai', guestCount: 30 };
     const plan = generateFallbackPlan(input);
     expect(plan.summary).toContain('30');
   });
@@ -110,9 +99,7 @@ describe('generateFallbackPlan', () => {
   it('handles very small budgets without negative amounts', () => {
     const input: WizardInput = { ...base, totalBudget: 100 };
     const plan = generateFallbackPlan(input);
-    plan.budget.forEach((c) => {
-      expect(c.amount).toBeGreaterThanOrEqual(0);
-    });
+    plan.budget.forEach((c) => expect(c.amount).toBeGreaterThanOrEqual(0));
     const total = plan.budget.reduce((s, c) => s + c.amount, 0);
     expect(total).toBe(100);
   });

@@ -1,10 +1,7 @@
-import type { FieldErrors } from './useWizardForm';
-import './EventDetailsStep.css';
 import React from 'react';
 import { getTodayInKolkata } from '@shared/schemas';
 
 interface EventDetailsStepProps {
-  errors?: FieldErrors;
   eventDate: string;
   city: string;
   guestCount: number;
@@ -33,87 +30,103 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
   onChangeDate,
   onChangeCity,
   onChangeGuests,
-  errors = {},
 }) => {
   const minDate = getTodayInKolkata();
 
   return (
-    <div className={['event-details-step-div-1'].join(' ')}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       <div>
-        <h2 className={['event-details-step-h2-2'].join(' ')}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
           When and where is the celebration?
         </h2>
-        <p className={['event-details-step-p-3'].join(' ')}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
           Provide the event date, Indian host city, and expected guest count.
         </p>
       </div>
 
       {/* Date */}
       <div>
-        <label htmlFor="event-date" className={['event-details-step-label-4'].join(' ')}>
+        <label
+          htmlFor="event-date"
+          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
+        >
           Event Date (YYYY-MM-DD):
         </label>
         <input
           id="event-date"
-          aria-invalid={Boolean(errors.eventDate)}
-          aria-describedby={
-            errors.eventDate ? 'event-date-help event-date-error' : 'event-date-help'
-          }
           type="date"
           min={minDate}
           value={eventDate}
-          onChange={(e) => {
-            onChangeDate(e.target.value);
-          }}
+          onChange={(e) => onChangeDate(e.target.value)}
           required
-          className={['event-details-step-input-5'].join(' ')}
+          style={{
+            width: '100%',
+            maxWidth: '320px',
+            padding: '0.75rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--surface-border)',
+            background: 'var(--surface-card)',
+            color: 'var(--text-main)',
+            fontSize: '1rem',
+          }}
         />
-        <span id="event-date-help" className={['event-details-step-span-6'].join(' ')}>
+        <span
+          style={{
+            display: 'block',
+            fontSize: '0.8rem',
+            color: 'var(--text-light)',
+            marginTop: '0.25rem',
+          }}
+        >
           Date is evaluated in Asia/Kolkata timezone.
         </span>
       </div>
 
-      {errors.eventDate && (
-        <p id="event-date-error" className="wizard-field-error">
-          {errors.eventDate}
-        </p>
-      )}
       {/* City */}
       <div>
-        <label htmlFor="event-city" className={['event-details-step-label-7'].join(' ')}>
+        <label
+          htmlFor="event-city"
+          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
+        >
           Host City in India:
         </label>
         <input
           id="event-city"
-          aria-invalid={Boolean(errors.city)}
-          aria-describedby={errors.city ? 'event-city-error' : undefined}
           type="text"
           placeholder="e.g. Jaipur, Bengaluru, Mumbai"
           value={city}
-          onChange={(e) => {
-            onChangeCity(e.target.value);
-          }}
+          onChange={(e) => onChangeCity(e.target.value)}
           required
-          className={['event-details-step-input-8'].join(' ')}
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            padding: '0.75rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--surface-border)',
+            background: 'var(--surface-card)',
+            color: 'var(--text-main)',
+            fontSize: '1rem',
+            marginBottom: '0.5rem',
+          }}
         />
-        <div className={['event-details-step-div-9'].join(' ')}>
-          <span className={['event-details-step-span-10'].join(' ')}>Popular:</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', marginRight: '0.25rem' }}>
+            Popular:
+          </span>
           {POPULAR_CITIES.map((c) => (
             <button
               key={c}
               type="button"
-              onClick={() => {
-                onChangeCity(c);
+              onClick={() => onChangeCity(c)}
+              style={{
+                fontSize: '0.75rem',
+                padding: '0.2rem 0.6rem',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--surface-border)',
+                background: city === c ? 'var(--primary-saffron)' : 'rgba(0,0,0,0.03)',
+                color: city === c ? '#ffffff' : 'var(--text-main)',
+                cursor: 'pointer',
               }}
-              className={[
-                'event-details-step-button-11',
-                city === c
-                  ? 'event-details-step-button-11-background-yes'
-                  : 'event-details-step-button-11-background-no',
-                city === c
-                  ? 'event-details-step-button-11-color-yes'
-                  : 'event-details-step-button-11-color-no',
-              ].join(' ')}
             >
               {c}
             </button>
@@ -121,18 +134,27 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
         </div>
       </div>
 
-      {errors.city && (
-        <p id="event-city-error" className="wizard-field-error">
-          {errors.city}
-        </p>
-      )}
       {/* Guest Count */}
       <div>
-        <div className={['event-details-step-div-12'].join(' ')}>
-          <label htmlFor="guest-count" className={['event-details-step-label-13'].join(' ')}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            maxWidth: '400px',
+            marginBottom: '0.5rem',
+          }}
+        >
+          <label htmlFor="guest-count" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
             Expected Guest Count:
           </label>
-          <span className={['event-details-step-span-14'].join(' ')}>
+          <span
+            style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              color: 'var(--primary-saffron)',
+            }}
+          >
             {guestCount.toLocaleString('en-IN')} guests
           </span>
         </div>
@@ -144,14 +166,19 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
           max={5000}
           step={guestCount > 500 ? 50 : 10}
           value={Math.min(5000, guestCount)}
-          onChange={(e) => {
-            onChangeGuests(parseInt(e.target.value, 10));
+          onChange={(e) => onChangeGuests(parseInt(e.target.value, 10))}
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            accentColor: 'var(--primary-saffron)',
+            marginBottom: '0.75rem',
           }}
-          className={['event-details-step-input-15'].join(' ')}
         />
 
-        <div className={['event-details-step-div-16'].join(' ')}>
-          <span className={['event-details-step-span-17'].join(' ')}>Or type exact count:</span>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Or type exact count:
+          </span>
           <input
             type="number"
             min={0}
@@ -161,19 +188,19 @@ export const EventDetailsStep: React.FC<EventDetailsStepProps> = ({
               const val = parseInt(e.target.value, 10);
               onChangeGuests(isNaN(val) ? 0 : Math.min(10000, Math.max(0, val)));
             }}
-            id="exact-guest-count"
             aria-label="Exact guest count"
-            aria-invalid={Boolean(errors.guestCount)}
-            aria-describedby={errors.guestCount ? 'guest-count-error' : undefined}
-            className={['event-details-step-input-18'].join(' ')}
+            style={{
+              width: '100px',
+              padding: '0.4rem 0.6rem',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--surface-border)',
+              background: 'var(--surface-card)',
+              color: 'var(--text-main)',
+              fontSize: '0.9rem',
+            }}
           />
         </div>
       </div>
-      {errors.guestCount && (
-        <p id="guest-count-error" className="wizard-field-error">
-          {errors.guestCount}
-        </p>
-      )}
     </div>
   );
 };

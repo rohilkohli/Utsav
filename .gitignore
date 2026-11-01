@@ -6,5 +6,3 @@ env.yaml
 *.log
 .DS_Store
 coverage/
-test-results/
-playwright-report/

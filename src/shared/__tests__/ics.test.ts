@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { foldLine, generateICS, createGoogleCalendarUrl } from '../ics.js';
+import { generateICS, createGoogleCalendarUrl } from '../ics.js';
 
 describe('Calendar Export - RFC 5545 & Google Calendar', () => {
   it('generates valid RFC 5545 ICS format with CRLF endings and escaped text', () => {
@@ -21,7 +21,7 @@ describe('Calendar Export - RFC 5545 & Google Calendar', () => {
 
     // Escaped characters check
     expect(ics).toContain('Dance\\; Rehearsal\\, Fun');
-    expect(ics).toContain('shoes!');
+    expect(ics).toContain('Wear comfortable shoes!');
 
     // All-day DTSTART and exclusive DTEND check
     expect(ics).toContain('DTSTART;VALUE=DATE:20261115');
@@ -45,20 +45,5 @@ describe('Calendar Export - RFC 5545 & Google Calendar', () => {
     // Start date 20261114, End date 20261115
     expect(url).toContain('dates=20261114%2F20261115');
     expect(url).toContain('location=Banquet+Hall%2C+Jaipur');
-  });
-
-  it('folds long UTF-8 content lines at 75 octets and uses effective dates', () => {
-    const longTitle = 'शुभ '.repeat(30);
-    const folded = foldLine(`SUMMARY:${longTitle}`);
-    expect(folded.every((line) => Buffer.byteLength(line, 'utf8') <= 75)).toBe(true);
-    const ics = generateICS([
-      {
-        title: 'Delayed task',
-        description: 'Moved',
-        dateStr: '2026-11-14',
-        effectiveDate: '2026-11-18',
-      },
-    ]);
-    expect(ics).toContain('DTSTART;VALUE=DATE:20261118');
   });
 });

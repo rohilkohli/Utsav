@@ -19,38 +19,38 @@ export const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   GEMINI_API_KEY: z
     .string({
-      message: 'GEMINI_API_KEY is required',
+      required_error: 'GEMINI_API_KEY is required',
     })
     .min(1, 'GEMINI_API_KEY is required and cannot be empty'),
   GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
   FIREBASE_API_KEY: z
     .string({
-      message: 'FIREBASE_API_KEY is required',
+      required_error: 'FIREBASE_API_KEY is required',
     })
     .min(1, 'FIREBASE_API_KEY is required'),
   FIREBASE_AUTH_DOMAIN: z
     .string({
-      message: 'FIREBASE_AUTH_DOMAIN is required',
+      required_error: 'FIREBASE_AUTH_DOMAIN is required',
     })
     .min(1, 'FIREBASE_AUTH_DOMAIN is required'),
   FIREBASE_PROJECT_ID: z
     .string({
-      message: 'FIREBASE_PROJECT_ID is required',
+      required_error: 'FIREBASE_PROJECT_ID is required',
     })
     .min(1, 'FIREBASE_PROJECT_ID is required'),
   FIREBASE_STORAGE_BUCKET: z
     .string({
-      message: 'FIREBASE_STORAGE_BUCKET is required',
+      required_error: 'FIREBASE_STORAGE_BUCKET is required',
     })
     .min(1, 'FIREBASE_STORAGE_BUCKET is required'),
   FIREBASE_MESSAGING_SENDER_ID: z
     .string({
-      message: 'FIREBASE_MESSAGING_SENDER_ID is required',
+      required_error: 'FIREBASE_MESSAGING_SENDER_ID is required',
     })
     .min(1, 'FIREBASE_MESSAGING_SENDER_ID is required'),
   FIREBASE_APP_ID: z
     .string({
-      message: 'FIREBASE_APP_ID is required',
+      required_error: 'FIREBASE_APP_ID is required',
     })
     .min(1, 'FIREBASE_APP_ID is required'),
   // Optional — enables real vendor search via Google Places API (New)

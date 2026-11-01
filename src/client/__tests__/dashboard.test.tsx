@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -183,7 +182,7 @@ describe('Dashboard Component & Accessibility (vitest-axe)', () => {
     const timelineTab = screen.getByRole('tab', { name: /timeline/i });
     await user.click(timelineTab);
 
-    expect(await screen.findByText('Book Palace Venue')).toBeInTheDocument();
+    expect(screen.getByText('Book Palace Venue')).toBeInTheDocument();
     expect(screen.getByText(/Export .ics Calendar/i)).toBeInTheDocument();
 
     const results = await axe(container);
@@ -206,9 +205,7 @@ describe('Dashboard Component & Accessibility (vitest-axe)', () => {
     const vendorsTab = screen.getByRole('tab', { name: /vendor checklist/i });
     await user.click(vendorsTab);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Palace Decorator', level: 3 }),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Palace Decorator')).toBeInTheDocument();
     expect(screen.getByText(/Are real flowers used for the floating mandap/i)).toBeInTheDocument();
 
     const results = await axe(container);
@@ -231,9 +228,7 @@ describe('Dashboard Component & Accessibility (vitest-axe)', () => {
     const ideasTab = screen.getByRole('tab', { name: /personalized ideas/i });
     await user.click(ideasTab);
 
-    expect(
-      await screen.findByLabelText(/Refine Food & Culinary Menus with AI/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Refine Food & Culinary Menus with AI/i)).toBeInTheDocument();
     expect(screen.getByText(/Dal Baati Churma/i)).toBeInTheDocument();
 
     const results = await axe(container);

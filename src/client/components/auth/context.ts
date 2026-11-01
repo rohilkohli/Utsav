@@ -12,7 +12,7 @@ export interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  login: () => Promise.reject(new Error('AuthProvider is required')),
-  logout: () => Promise.reject(new Error('AuthProvider is required')),
+  login: async () => {},
+  logout: async () => {},
   isGuest: true,
 });

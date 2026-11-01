@@ -28,7 +28,9 @@ router.post(
   async (req, res) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      return res.status(503).json({ error: 'GOOGLE_MAPS_API_KEY not configured on this server.' });
+      return res
+        .status(503)
+        .json({ error: 'GOOGLE_MAPS_API_KEY not configured on this server.' });
     }
 
     const parsed = SearchSchema.safeParse(req.body);

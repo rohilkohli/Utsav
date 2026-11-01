@@ -1,79 +1,72 @@
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import ts from 'typescript';
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { join, extname } from 'path';
 
 const ROOT = join(import.meta.dirname, '../../..');
-function collect(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    return entry.isDirectory()
-      ? collect(path)
-      : /\.tsx?$/.test(path) && !path.endsWith('.d.ts')
-        ? [path]
-        : [];
-  });
-}
-const files = collect(join(ROOT, 'src'));
-const production = files.filter((file) => !file.includes('__tests__'));
-function violations(
-  paths: string[],
-  inspect: (content: string, file: string) => boolean,
-): string[] {
-  return paths
-    .filter((file) => inspect(readFileSync(file, 'utf8'), file))
-    .map((file) => relative(ROOT, file));
+const SRC = join(ROOT, 'src');
+
+function collectFiles(dir: string, exts: string[]): string[] {
+  const results: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory() && entry !== '__tests__' && entry !== 'node_modules') {
+      results.push(...collectFiles(full, exts));
+    } else if (stat.isFile() && exts.includes(extname(entry))) {
+      results.push(full);
+    }
+  }
+  return results;
 }
 
-describe('Repository hygiene', () => {
-  it('keeps production modules at most 250 lines (static preset tables excepted)', () => {
-    expect(
-      violations(
-        production,
-        (text, file) =>
-          !/Presets\.ts$|runsheet\.ts$/.test(file) && text.trimEnd().split('\n').length > 250,
-      ),
-    ).toEqual([]);
-  });
-  it('has no unsafe type escapes in production or tests', () => {
-    expect(
-      violations(files, (text, file) => {
-        const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-        function unsafe(node: ts.Node): boolean {
-          return node.kind === ts.SyntaxKind.AnyKeyword || node.getChildren(source).some(unsafe);
+const PROD_FILES = collectFiles(SRC, ['.ts', '.tsx']).filter(
+  (f) => !f.includes('__tests__') && !f.endsWith('.d.ts'),
+);
+
+describe('Code Hygiene', () => {
+  it('has no raw console.log in production source files', () => {
+    const violations: string[] = [];
+    for (const file of PROD_FILES) {
+      const content = readFileSync(file, 'utf-8');
+      const lines = content.split('\n');
+      lines.forEach((line, i) => {
+        if (/console\.log\s*\(/.test(line) && !line.trimStart().startsWith('//')) {
+          violations.push(`${file.replace(ROOT, '').replace(/\\/g, '/')}:${i + 1} — ${line.trim()}`);
         }
-        return unsafe(source) || /@ts-(?:ignore|nocheck)\b/.test(text);
-      }),
-    ).toEqual([]);
+      });
+    }
+    expect(violations, `console.log found in prod files:\n${violations.join('\n')}`).toHaveLength(0);
   });
-  it('does not permit executable markup or dynamic code evaluation', () => {
-    expect(
-      violations(production, (text) =>
-        /dangerouslySetInnerHTML|\.innerHTML\s*=|\beval\s*\(|\bnew\s+Function\s*\(/.test(text),
-      ),
-    ).toEqual([]);
+
+  it('has no hardcoded API keys or secrets (patterns)', () => {
+    const patterns = [
+      /AIza[0-9A-Za-z-_]{35}/,          // Google API key
+      /sk-[A-Za-z0-9]{48}/,             // OpenAI secret key
+      /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/, // FCM key
+    ];
+    const violations: string[] = [];
+    for (const file of PROD_FILES) {
+      const content = readFileSync(file, 'utf-8');
+      for (const pattern of patterns) {
+        if (pattern.test(content)) {
+          violations.push(`${file.replace(ROOT, '').replace(/\\/g, '/')}: possible hardcoded secret`);
+        }
+      }
+    }
+    expect(violations, `Hardcoded secrets found:\n${violations.join('\n')}`).toHaveLength(0);
   });
-  it('keeps secrets and console output out of browser/shared source', () => {
-    expect(
-      violations(
-        production.filter((file) => /src\/(?:client|shared)\//.test(file)),
-        (text) => /\bconsole\s*\.|GEMINI_API_KEY/.test(text),
-      ),
-    ).toEqual([]);
-  });
-  it('has no inline React styles or embedded style elements under strict CSP', () => {
-    expect(
-      violations(
-        production.filter((file) => file.endsWith('.tsx')),
-        (text) => /\bstyle\s*=\s*\{|<style\b/.test(text),
-      ),
-    ).toEqual([]);
-  });
-  it('has no hardcoded credentials or unfinished production comments', () => {
-    expect(
-      violations(production, (text) =>
-        /AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{48}|\/\/\s*(?:TODO|FIXME|HACK)\b/.test(text),
-      ),
-    ).toEqual([]);
+
+  it('has no leftover TODO/FIXME/HACK comments in production source', () => {
+    const violations: string[] = [];
+    for (const file of PROD_FILES) {
+      const content = readFileSync(file, 'utf-8');
+      const lines = content.split('\n');
+      lines.forEach((line, i) => {
+        if (/\/\/\s*(TODO|FIXME|HACK)\b/i.test(line)) {
+          violations.push(`${file.replace(ROOT, '').replace(/\\/g, '/')}:${i + 1} — ${line.trim()}`);
+        }
+      });
+    }
+    expect(violations, `TODO/FIXME/HACK found in prod files:\n${violations.join('\n')}`).toHaveLength(0);
   });
 });

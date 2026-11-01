@@ -1,12 +1,9 @@
-import './BudgetStep.css';
-import React, { useEffect, useRef, useState } from 'react';
-import type { FieldErrors } from './useWizardForm';
+import React from 'react';
 import type { EventType } from '@shared/schemas';
 import { BUDGET_PRESETS } from '@shared/budget';
 import { formatINR, parseINR } from '@shared/currency';
 
 interface BudgetStepProps {
-  errors?: FieldErrors;
   eventType: EventType;
   totalBudget: number;
   onChangeBudget: (budget: number) => void;
@@ -16,94 +13,108 @@ export const BudgetStep: React.FC<BudgetStepProps> = ({
   eventType,
   totalBudget,
   onChangeBudget,
-  errors = {},
 }) => {
-  const [text, setText] = useState(Number.isFinite(totalBudget) ? formatINR(totalBudget) : '');
-  const editing = useRef(false);
-  useEffect(() => {
-    if (!editing.current) setText(Number.isFinite(totalBudget) ? formatINR(totalBudget) : '');
-  }, [totalBudget]);
-  const presets = BUDGET_PRESETS[eventType];
+  const presets = BUDGET_PRESETS[eventType] || BUDGET_PRESETS.wedding;
 
   return (
-    <div className={['budget-step-div-1'].join(' ')}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       <div>
-        <h2 className={['budget-step-h2-2'].join(' ')}>What is your total target budget?</h2>
-        <p className={['budget-step-p-3'].join(' ')}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+          What is your total target budget?
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
           Utsav will allocate realistic percentages per category using deterministic rupee math.
         </p>
       </div>
 
       <div>
-        <label htmlFor="total-budget-input" className={['budget-step-label-4'].join(' ')}>
+        <label
+          htmlFor="total-budget-input"
+          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
+        >
           Total Budget in Indian Rupees (₹):
         </label>
 
-        <div className={['budget-step-div-5'].join(' ')}>
+        <div style={{ position: 'relative', maxWidth: '360px' }}>
           <input
             id="total-budget-input"
             type="text"
-            value={text}
-            aria-invalid={Boolean(errors.totalBudget)}
-            aria-describedby={errors.totalBudget ? 'budget-error' : undefined}
-            onFocus={() => {
-              editing.current = true;
-            }}
-            onBlur={() => {
-              editing.current = false;
-              if (Number.isFinite(totalBudget)) setText(formatINR(totalBudget));
-            }}
+            value={totalBudget ? formatINR(totalBudget) : ''}
             placeholder="₹0"
             onChange={(e) => {
-              setText(e.target.value);
               const parsed = parseINR(e.target.value);
-              onChangeBudget(parsed ?? Number.NaN);
+              onChangeBudget(parsed);
             }}
-            className={['budget-step-input-6'].join(' ')}
+            style={{
+              width: '100%',
+              padding: '0.85rem 1rem',
+              fontSize: '1.35rem',
+              fontWeight: 700,
+              color: 'var(--primary-saffron)',
+              borderRadius: 'var(--radius-md)',
+              border: '2px solid var(--primary-saffron)',
+              background: 'var(--surface-card)',
+            }}
           />
         </div>
       </div>
 
-      {errors.totalBudget && (
-        <p id="budget-error" className="wizard-field-error">
-          Enter a valid budget from ₹0 to ₹100 crore.
-        </p>
-      )}
       <div>
-        <span className={['budget-step-span-7'].join(' ')}>
+        <span
+          style={{
+            display: 'block',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            marginBottom: '0.75rem',
+            color: 'var(--text-muted)',
+          }}
+        >
           Or select a popular {eventType} budget tier:
         </span>
 
-        <div className={['budget-step-div-8'].join(' ')}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '0.75rem',
+          }}
+        >
           {presets.map((preset) => {
             const isSelected = totalBudget === preset.value;
             return (
               <button
                 key={preset.value}
                 type="button"
-                onClick={() => {
-                  onChangeBudget(preset.value);
+                onClick={() => onChangeBudget(preset.value)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: isSelected
+                    ? '2px solid var(--primary-saffron)'
+                    : '1px solid var(--surface-border)',
+                  background: isSelected ? 'var(--surface-card-hover)' : 'var(--surface-card)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  boxShadow: isSelected
+                    ? '0 0 0 1px var(--primary-saffron)'
+                    : 'var(--surface-shadow)',
+                  transition: 'all 0.15s ease',
                 }}
-                className={[
-                  'budget-step-button-9',
-                  isSelected ? 'budget-step-button-9-border-yes' : 'budget-step-button-9-border-no',
-                  isSelected
-                    ? 'budget-step-button-9-background-yes'
-                    : 'budget-step-button-9-background-no',
-                  isSelected
-                    ? 'budget-step-button-9-boxshadow-yes'
-                    : 'budget-step-button-9-boxshadow-no',
-                ].join(' ')}
               >
                 <span
-                  className={[
-                    'budget-step-span-10',
-                    isSelected ? 'budget-step-span-10-color-yes' : 'budget-step-span-10-color-no',
-                  ].join(' ')}
+                  style={{
+                    fontSize: '1.1rem',
+                    fontWeight: 700,
+                    color: isSelected ? 'var(--primary-saffron)' : 'var(--text-main)',
+                  }}
                 >
                   {formatINR(preset.value)}
                 </span>
-                <span className={['budget-step-span-11'].join(' ')}>
+                <span
+                  style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}
+                >
                   {preset.label.replace(/^₹[\d,]+\s*/, '')}
                 </span>
               </button>

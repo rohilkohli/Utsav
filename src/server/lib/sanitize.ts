@@ -33,7 +33,7 @@ export function sanitizeObject<T>(obj: T): T {
     return sanitizeText(obj) as T;
   }
   if (Array.isArray(obj)) {
-    return (obj as unknown[]).map((item) => sanitizeObject(item)) as T;
+    return obj.map((item) => sanitizeObject(item)) as T;
   }
   if (obj && typeof obj === 'object') {
     const clean: Record<string, unknown> = {};

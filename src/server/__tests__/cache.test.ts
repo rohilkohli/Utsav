@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createPlanCacheKey, getCachedPlan, setCachedPlan } from '../services/cache.js';
+import {
+  createPlanCacheKey,
+  getCachedPlan,
+  setCachedPlan,
+} from '../services/cache.js';
 import type { PlanOutput } from '../../shared/schemas.js';
 
 const mockPlan = (): PlanOutput => ({
@@ -89,40 +93,10 @@ describe('Plan Cache Service', () => {
     it('round-trips a full plan with budget, timeline, vendors and ideas', () => {
       const full: PlanOutput = {
         summary: 'Full plan',
-        budget: [
-          { id: 'b1', category: 'Venue', suggestedPercent: 40, amount: 40000, actual: 40000 },
-        ],
-        timeline: [
-          {
-            id: 't1',
-            title: 'Book venue',
-            description: 'Reserve venue',
-            daysBeforeEvent: 30,
-            date: '2026-10-01',
-            completed: false,
-          },
-        ],
-        vendors: [
-          {
-            id: 'v1',
-            category: 'Photographer',
-            budgetedAmount: 20000,
-            questionsToAsk: [],
-            bookByDaysBeforeEvent: 30,
-            bookByDate: '2026-10-01',
-            status: 'to-contact',
-            quotedAmount: 0,
-          },
-        ],
-        ideas: [
-          {
-            id: 'i1',
-            section: 'food',
-            title: 'Chaat Corner',
-            description: 'Live chaat',
-            estimatedCost: '₹5000',
-          },
-        ],
+        budget: [{ id: 'b1', category: 'Venue', suggestedPercent: 40, amount: 40000, actual: 40000 }],
+        timeline: [{ id: 't1', title: 'Book venue', date: '2026-10-01', completed: false }],
+        vendors: [{ id: 'v1', category: 'Photographer', budgetedAmount: 20000, questions: [] }],
+        ideas: [{ id: 'i1', section: 'food', title: 'Chaat Corner', description: 'Live chaat', estimatedCost: 5000 }],
       };
       setCachedPlan('plan_full_round_trip', full);
       const retrieved = getCachedPlan('plan_full_round_trip');

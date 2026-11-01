@@ -1,36 +1,27 @@
+/**
+ * Currency utility for Indian Rupee (₹) formatting with Indian digit grouping (e.g. ₹1,50,000)
+ */
 const inrFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
   maximumFractionDigits: 0,
 });
+
+/**
+ * Format a number as Indian Rupees with proper symbol and grouping.
+ * e.g. 150000 -> "₹1,50,000"
+ */
 export function formatINR(amount: number): string {
-  return Number.isFinite(amount) ? inrFormatter.format(Math.round(amount)) : '₹0';
+  if (isNaN(amount) || !isFinite(amount)) return '₹0';
+  return inrFormatter.format(Math.round(amount));
 }
 
-/** Accept common Indian amounts, while rejecting malformed numbers and negatives. */
-export function parseINR(value: string): number | null {
-  const text = value
-    .trim()
-    .toLowerCase()
-    .replace(/^(?:₹|rs\.?|inr)\s*/, '')
-    .trim();
-  const match = /^(\d[\d,]*(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?|l|k)?$/.exec(text);
-  if (!match?.[1]) return null;
-  const digits = match[1];
-  if (
-    digits.includes(',') &&
-    !/^(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})(?:\.\d+)?$/.test(digits)
-  )
-    return null;
-  const amount = Number(digits.replace(/,/g, ''));
-  const suffix = match[2] ?? '';
-  const multiplier = suffix.startsWith('cr')
-    ? 10_000_000
-    : /^(?:la|l$)/.test(suffix)
-      ? 100_000
-      : suffix === 'k'
-        ? 1000
-        : 1;
-  const rupees = Math.round(amount * multiplier);
-  return Number.isSafeInteger(rupees) ? rupees : null;
+/**
+ * Parse an input string with currency symbols, commas or whitespace into a clean integer amount.
+ */
+export function parseINR(value: string): number {
+  if (!value) return 0;
+  const cleaned = value.replace(/[^0-9]/g, '');
+  const parsed = parseInt(cleaned, 10);
+  return isNaN(parsed) ? 0 : parsed;
 }

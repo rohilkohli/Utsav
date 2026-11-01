@@ -14,7 +14,6 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { generateEventPlan } from '../services/gemini.js';
 import { getPlanRepository } from '../repositories/index.js';
 import { logger } from '../lib/logger.js';
-import { runAiResponse } from './aiResponse.js';
 
 const router = Router();
 
@@ -40,25 +39,36 @@ router.post(
   express.json({ limit: '100kb' }),
   validateBody(generatePlanRequestSchema),
   async (req, res) => {
-    const { input } = generatePlanRequestSchema.parse(req.body);
-    await runAiResponse(req, res, async (context) => {
-      const { plan, source, model } = await generateEventPlan(input, context);
+    try {
+      const { input } = req.body;
+      const { plan, source } = await generateEventPlan(input);
       const planId = crypto.randomUUID();
+
+      // Only signed-in users persist plans to Firestore
       if (req.user) {
         const now = new Date().toISOString();
-        await getPlanRepository().savePlan(
-          savedPlanSchema.parse({
-            id: planId,
-            ownerUid: req.user.uid,
-            input,
-            plan,
-            createdAt: now,
-            updatedAt: now,
-          }),
-        );
+        const savedPlan = {
+          id: planId,
+          ownerUid: req.user.uid,
+          input,
+          plan,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const planRepo = getPlanRepository();
+        await planRepo.savePlan(savedPlan);
       }
-      return { plan, planId, meta: { source, model } };
-    });
+
+      res.status(200).json({
+        plan,
+        planId,
+        meta: { source },
+      });
+    } catch (err) {
+      logger.error(`POST /api/plan failed: ${err instanceof Error ? err.message : String(err)}`);
+      res.status(500).json({ error: 'Failed to generate event plan' });
+    }
   },
 );
 
@@ -74,13 +84,13 @@ router.post(
   validateBody(savePlanRequestSchema),
   async (req, res) => {
     try {
-      const { input, plan } = savePlanRequestSchema.parse(req.body);
+      const { input, plan } = req.body;
       const planId = crypto.randomUUID();
       const now = new Date().toISOString();
 
       const savedPlan = {
         id: planId,
-        ownerUid: req.user?.uid ?? '',
+        ownerUid: req.user!.uid,
         input,
         plan,
         createdAt: now,
@@ -95,9 +105,7 @@ router.post(
         plan: savedPlanSchema.parse(savedPlan),
       });
     } catch (err) {
-      logger.error(
-        `POST /api/plan/save failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      logger.error(`POST /api/plan/save failed: ${err instanceof Error ? err.message : String(err)}`);
       res.status(500).json({ error: 'Failed to save plan' });
     }
   },
@@ -111,10 +119,10 @@ router.post(
 router.get('/plan/:id', requireAuth, async (req, res) => {
   try {
     const planRepo = getPlanRepository();
-    const plan = await planRepo.getPlan(String(req.params.id));
+    const plan = await planRepo.getPlan(req.params.id);
 
     // Fail closed with 404 for missing documents or unauthorized cross-user access
-    if (plan?.ownerUid !== req.user?.uid) {
+    if (!plan || plan.ownerUid !== req.user!.uid) {
       res.status(404).json({ error: 'Plan not found' });
       return;
     }
@@ -142,18 +150,14 @@ router.put(
   async (req, res) => {
     try {
       const planRepo = getPlanRepository();
-      const existingPlan = await planRepo.getPlan(String(req.params.id));
+      const existingPlan = await planRepo.getPlan(req.params.id);
 
-      if (!existingPlan) {
-        res.status(404).json({ error: 'Plan not found' });
-        return;
-      }
-      if (existingPlan.ownerUid !== req.user?.uid) {
+      if (!existingPlan || existingPlan.ownerUid !== req.user!.uid) {
         res.status(404).json({ error: 'Plan not found' });
         return;
       }
 
-      const { plan, input } = updatePlanRequestSchema.parse(req.body);
+      const { plan, input } = req.body;
       const updatedPlan = {
         id: existingPlan.id,
         ownerUid: existingPlan.ownerUid,

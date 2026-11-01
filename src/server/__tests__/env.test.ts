@@ -29,7 +29,7 @@ describe('Server Startup Environment Validation (Zod fail-fast)', () => {
   });
 
   it('fails fast with a clear message listing all missing variables', () => {
-    expect(() => validateEnv({})).toThrow(/Server startup failed/);
+    expect(() => validateEnv({})).toThrowError(/Server startup failed/);
 
     try {
       validateEnv({});
@@ -52,6 +52,6 @@ describe('Server Startup Environment Validation (Zod fail-fast)', () => {
         ...validEnv,
         GEMINI_API_KEY: '',
       }),
-    ).toThrow(/GEMINI_API_KEY/);
+    ).toThrowError(/GEMINI_API_KEY/);
   });
 });

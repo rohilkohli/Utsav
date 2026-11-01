@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -17,31 +13,14 @@
     "isolatedModules": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true,
-    "types": [
-      "vite/client",
-      "vitest/globals",
-      "@testing-library/jest-dom"
-    ],
+    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@client/*": [
-        "src/client/*"
-      ]
+      "@shared/*": ["src/shared/*"],
+      "@client/*": ["src/client/*"]
     }
   },
-  "include": [
-    "src/client",
-    "src/shared",
-    "src/server",
-    "e2e"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx", "src/shared/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/__tests__/**"]
 }

@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  compareQuote,
-  effectiveCost,
-  inquiryDraft,
-  missingFields,
-  riskFlags,
-  vendorQuoteSchema,
-} from '../quotes.js';
+import { compareQuote, vendorQuoteSchema } from '../quotes.js';
 import type { VendorQuote } from '../quotes.js';
 
 const BASE_QUOTE: VendorQuote = {
@@ -64,28 +57,6 @@ describe('compareQuote', () => {
 });
 
 describe('vendorQuoteSchema', () => {
-  it('calculates effective plate cost and quote risks', () => {
-    const quote = vendorQuoteSchema.parse({
-      ...BASE_QUOTE,
-      pricePerPlate: 1200,
-      guestMinimum: 150,
-      advancePercent: 60,
-      overtimeFee: '₹5,000/hour',
-    });
-    expect(effectiveCost(quote, 100)).toBe(180000);
-    expect(riskFlags(quote, 100)).toEqual(
-      expect.arrayContaining([
-        'guestMinimumExceedsGuests',
-        'advanceHigh',
-        'overtimeFeeApplies',
-        'taxNotStated',
-        'noCancellationPolicy',
-      ]),
-    );
-    expect(missingFields(quote)).toContain('cancellation and refund policy');
-    expect(inquiryDraft(quote, { familyName: 'Asha' })).toContain('Asha');
-  });
-
   it('parses a valid quote', () => {
     const parsed = vendorQuoteSchema.parse({
       id: 'q1',

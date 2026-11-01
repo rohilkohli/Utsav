@@ -1,5 +1,4 @@
-// @vitest-environment jsdom
-
+import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
@@ -46,7 +45,7 @@ describe('RunSheetTab', () => {
     render(<RunSheetTab eventType="wedding" eventDate="2026-12-10" />);
     const items = screen.getAllByRole('listitem');
     // At least first item should have content from the run sheet
-    expect(items[0]?.textContent).toBeTruthy();
+    expect(items[0].textContent).toBeTruthy();
   });
 
   it('emoji icon has aria-hidden', () => {

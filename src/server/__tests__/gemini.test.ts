@@ -47,7 +47,7 @@ describe('Gemini Service & Prompts Branches', () => {
   it('builds prompts covering both empty and specified optional fields', () => {
     const promptFull = buildPlanPrompt(weddingInput);
     expect(promptFull).toContain('Indian Wedding');
-    expect(promptFull).toContain('Dietary Constraints: <user_text>\nPure Vegetarian');
+    expect(promptFull).toContain('Dietary Constraints: Pure Vegetarian');
 
     const promptMinimal = buildPlanPrompt(birthdayMinimal);
     expect(promptMinimal).toContain('Birthday / Milestone');
@@ -125,8 +125,6 @@ describe('Gemini Service & Prompts Branches', () => {
           title: 'Order Cake',
           description: 'Chocolate truffle',
           daysBeforeEvent: 7,
-          durationDays: 3,
-          dependsOn: [],
           subEvent: 'Party',
         },
       ],
@@ -153,8 +151,8 @@ describe('Gemini Service & Prompts Branches', () => {
 
     const enriched = enrichRawPlan(raw, birthdayMinimal);
     expect(enriched.summary).toBe(raw.summary);
-    expect(enriched.budget[0]?.subEvent).toBe('Dinner');
-    expect(enriched.vendors[0]?.budgetedAmount).toBeGreaterThan(0);
+    expect(enriched.budget[0].subEvent).toBe('Dinner');
+    expect(enriched.vendors[0].budgetedAmount).toBeGreaterThan(0);
   });
 
   it('verifies snapshot expiration logic', async () => {

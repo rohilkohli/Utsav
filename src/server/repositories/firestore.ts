@@ -1,11 +1,6 @@
 import admin from 'firebase-admin';
 import crypto from 'crypto';
-import {
-  savedPlanSchema,
-  type SavedPlan,
-  type WizardInput,
-  type PlanOutput,
-} from '../../shared/schemas.js';
+import { savedPlanSchema, type SavedPlan, type WizardInput, type PlanOutput } from '../../shared/schemas.js';
 import type { PlanRepository, ShareRepository, ShareSnapshotResult } from './types.js';
 
 /**
@@ -71,13 +66,10 @@ export class FirestoreRepository implements PlanRepository, ShareRepository {
 
     const db = this.getDb();
     const timestamp = admin.firestore.Timestamp.fromDate(expiresAtDate);
-    await db
-      .collection('shares')
-      .doc(shareToken)
-      .set({
-        ...baseDoc,
-        expiresAt: timestamp,
-      });
+    await db.collection('shares').doc(shareToken).set({
+      ...baseDoc,
+      expiresAt: timestamp,
+    });
 
     return {
       shareToken,
@@ -97,7 +89,7 @@ export class FirestoreRepository implements PlanRepository, ShareRepository {
       return null;
     }
 
-    const data: Record<string, unknown> | undefined = doc.data();
+    const data = doc.data();
     if (!data) return null;
 
     // Fail-closed TTL check: if expiresAt is missing or invalid type, treat as expired
@@ -108,8 +100,9 @@ export class FirestoreRepository implements PlanRepository, ShareRepository {
     const expiresAt = data.expiresAt;
     const isTimestamp =
       typeof expiresAt === 'object' &&
+      expiresAt !== null &&
       'toMillis' in expiresAt &&
-      typeof expiresAt.toMillis === 'function';
+      typeof (expiresAt as { toMillis: unknown }).toMillis === 'function';
     const isDate = expiresAt instanceof Date;
 
     if (!isTimestamp && !isDate) {
@@ -126,14 +119,10 @@ export class FirestoreRepository implements PlanRepository, ShareRepository {
 
     // Convert Firestore Timestamp to ISO string for the client transport boundary
     let expiresAtIso: string;
-    if (
-      isTimestamp &&
-      'toDate' in expiresAt &&
-      typeof (expiresAt as { toDate: unknown }).toDate === 'function'
-    ) {
+    if (isTimestamp && 'toDate' in expiresAt && typeof (expiresAt as { toDate: unknown }).toDate === 'function') {
       expiresAtIso = (expiresAt as { toDate: () => Date }).toDate().toISOString();
     } else if (isDate) {
-      expiresAtIso = expiresAt.toISOString();
+      expiresAtIso = (expiresAt as Date).toISOString();
     } else {
       return null;
     }

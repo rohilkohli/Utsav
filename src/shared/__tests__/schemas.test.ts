@@ -48,7 +48,7 @@ describe('Zod Schemas - Single Source of Truth Validation', () => {
     const parsed = wizardInputSchema.safeParse(invalidWedding);
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
-      expect(parsed.error.issues[0]?.message).toContain('at least one ceremony');
+      expect(parsed.error.issues[0].message).toContain('at least one ceremony');
     }
   });
 
@@ -64,7 +64,7 @@ describe('Zod Schemas - Single Source of Truth Validation', () => {
     const parsed = wizardInputSchema.safeParse(pastInput);
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
-      expect(parsed.error.issues[0]?.message).toContain('cannot be in the past');
+      expect(parsed.error.issues[0].message).toContain('cannot be in the past');
     }
   });
 
@@ -116,7 +116,7 @@ describe('Zod Schemas - Single Source of Truth Validation', () => {
   });
 
   it('generates valid JSON schemas via z.toJSONSchema with non-empty properties and all required keys', () => {
-    const planSchema = getGeminiPlanJsonSchema();
+    const planSchema = getGeminiPlanJsonSchema() as Record<string, unknown>;
     expect(planSchema).toBeDefined();
     expect(typeof planSchema).toBe('object');
     expect(planSchema.properties).toBeDefined();
@@ -134,7 +134,7 @@ describe('Zod Schemas - Single Source of Truth Validation', () => {
       expect.arrayContaining(['summary', 'budget', 'timeline', 'vendors', 'ideas']),
     );
 
-    const refineSchema = getGeminiRefineJsonSchema();
+    const refineSchema = getGeminiRefineJsonSchema() as Record<string, unknown>;
     expect(refineSchema).toBeDefined();
     expect(typeof refineSchema).toBe('object');
     expect(refineSchema.properties).toBeDefined();
