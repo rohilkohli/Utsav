@@ -1,3 +1,4 @@
+import './SharedPlanView.css';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { SavedPlan } from '@shared/schemas';
@@ -12,6 +13,10 @@ export const SharedPlanView: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setSavedPlan(null);
     if (!token) {
       setError('Invalid share link');
       setLoading(false);
@@ -20,74 +25,66 @@ export const SharedPlanView: React.FC = () => {
 
     apiGetSharedPlan(token)
       .then((plan) => {
+        if (!active) return;
         setSavedPlan(plan);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
+        if (!active) return;
         setError(err instanceof Error ? err.message : 'Plan expired or not found');
         setLoading(false);
       });
+    return () => {
+      active = false;
+    };
   }, [token]);
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
-        <p style={{ fontSize: '1.25rem', color: 'var(--primary-saffron)', fontWeight: 600 }}>
+      <main id="main" className={['shared-plan-view-div-1'].join(' ')}>
+        <p className={['shared-plan-view-p-2'].join(' ')}>
           🎉 Loading shared celebration blueprint...
         </p>
-      </div>
+      </main>
     );
   }
 
   if (error || !savedPlan) {
     return (
-      <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-          Plan Link Expired or Not Found
-        </h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+      <main id="main" className={['shared-plan-view-div-3'].join(' ')}>
+        <h2 className={['shared-plan-view-h2-4'].join(' ')}>Plan Link Expired or Not Found</h2>
+        <p className={['shared-plan-view-p-5'].join(' ')}>
           This celebration snapshot may have expired or was removed.
         </p>
         <button
           type="button"
-          onClick={() => navigate('/')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: 'var(--primary-saffron)',
-            color: '#ffffff',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            fontWeight: 700,
-            cursor: 'pointer',
+          onClick={() => {
+            void navigate('/');
           }}
+          className={['shared-plan-view-button-6'].join(' ')}
         >
           Plan Your Own Celebration on Utsav →
         </button>
-      </div>
+      </main>
     );
   }
 
   return (
     <div>
-      <div
-        style={{
-          background: 'rgba(0, 105, 92, 0.1)',
-          borderBottom: '1px solid var(--primary-emerald)',
-          padding: '0.6rem 1rem',
-          textAlign: 'center',
-          fontSize: '0.85rem',
-          color: 'var(--primary-emerald)',
-          fontWeight: 600,
-        }}
-      >
+      <div className={['shared-plan-view-div-7'].join(' ')}>
         👁️ You are viewing a read-only shared celebration plan.
       </div>
 
       <DashboardShell
+        readOnly
         input={savedPlan.input}
         plan={savedPlan.plan}
-        onUpdatePlan={() => {}}
-        onNewPlan={() => navigate('/')}
+        onUpdatePlan={() => {
+          return;
+        }}
+        onNewPlan={() => {
+          void navigate('/');
+        }}
       />
     </div>
   );

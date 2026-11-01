@@ -15,6 +15,13 @@ export default defineConfig({
     outDir: 'dist/client',
     sourcemap: true,
     rollupOptions: {
+      onwarn(warning, report) {
+        // Zod's prose comments mention PURE annotations; Rollup safely discards those comments.
+        if (warning.code === 'INVALID_ANNOTATION' && warning.id?.includes('/node_modules/zod/')) {
+          return;
+        }
+        report(warning);
+      },
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
@@ -29,6 +36,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        xfwd: true,
+        ws: true,
       },
     },
   },

@@ -22,16 +22,18 @@ router.post(
   '/share',
   optionalAuth,
   writeLimiter,
-  express.json({ limit: '200kb' }),
+  express.json({ limit: '100kb' }),
   validateBody(shareRequestSchema),
   async (req, res) => {
     try {
-      const { input, plan } = req.body;
+      const { input, plan } = shareRequestSchema.parse(req.body);
       const shareRepo = getShareRepository();
       const { shareToken, expiresAt } = await shareRepo.createShare(input, plan);
 
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const host = req.get('host');
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const requestedProto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+      const protocol = requestedProto === 'https' ? 'https' : req.protocol;
+      const host = req.get('x-forwarded-host') ?? req.get('host');
       const shareUrl = `${protocol}://${host}/share/${shareToken}`;
 
       res.status(200).json({
@@ -55,14 +57,16 @@ router.post(
 router.get('/share/:token', readLimiter, async (req, res) => {
   try {
     const shareRepo = getShareRepository();
-    const snapshot = await shareRepo.getShare(req.params.token);
+    const snapshot = await shareRepo.getShare(String(req.params.token));
     if (!snapshot) {
       res.status(404).json({ error: 'Shared plan not found or link has expired' });
       return;
     }
     res.status(200).json(savedPlanSchema.parse(snapshot));
   } catch (err) {
-    logger.error(`GET /api/share/:token failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.error(
+      `GET /api/share/:token failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
     res.status(500).json({ error: 'Failed to retrieve shared plan' });
   }
 });

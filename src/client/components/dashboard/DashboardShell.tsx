@@ -1,389 +1,210 @@
-import React, { useState } from 'react';
-import type { PlanOutput, WizardInput, BudgetCategory, Vendor, Idea } from '@shared/schemas';
-import { BudgetTab } from './BudgetTab';
-import { TimelineTab } from './TimelineTab';
-import { VendorsTab } from './VendorsTab';
-import { IdeasTab } from './IdeasTab';
-import { RunSheetTab } from './RunSheetTab';
-import { ShareModal } from '../shared/ShareModal';
+import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
+import type { PlanOutput, WizardInput } from '@shared/schemas';
 import { useAuth } from '../../hooks/useAuth.js';
-import { calculateBudgetTotals } from '@shared/budget';
-import { suggestTradeoffs } from '@shared/tradeoffs';
-
+import { AssistantPanel } from './AssistantPanel';
+import { PrintSummary } from './PrintSummary';
+import { DashboardPanel } from './DashboardPanel';
+import { TradeoffSuggestions } from './TradeoffSuggestions';
+import './dashboard.css';
+const ShareModal = lazy(() =>
+  import('../shared/ShareModal').then((module) => ({ default: module.ShareModal })),
+);
+export type TabType = 'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet';
+const tabs: { id: TabType; label: string; icon: string }[] = [
+  { id: 'budget', label: 'Budget Planner', icon: '💰' },
+  { id: 'timeline', label: 'Timeline & Milestones', icon: '⏳' },
+  { id: 'vendors', label: 'Vendor Checklist', icon: '🤝' },
+  { id: 'ideas', label: 'Personalized Ideas', icon: '✨' },
+  { id: 'runsheet', label: 'Day-of Run Sheet', icon: '📋' },
+];
 interface DashboardShellProps {
   input: WizardInput;
   plan: PlanOutput;
   isFallback?: boolean;
+  readOnly?: boolean;
   activeTab?: TabType;
   onTabChange?: (tab: TabType) => void;
-  onUpdatePlan: (updated: PlanOutput, newBudget?: number) => void;
+  onUpdatePlan: (updated: PlanOutput, newBudget?: number, newGuestCount?: number) => void;
   onNewPlan: () => void;
 }
-
-type TabType = 'budget' | 'timeline' | 'vendors' | 'ideas' | 'runsheet';
-
-export const DashboardShell: React.FC<DashboardShellProps> = ({
+export const DashboardShell = memo(function DashboardShell({
   input,
   plan,
   isFallback,
+  readOnly = false,
   activeTab: controlledTab,
   onTabChange,
   onUpdatePlan,
   onNewPlan,
-}) => {
+}: DashboardShellProps) {
   const [internalTab, setInternalTab] = useState<TabType>('budget');
   const activeTab = controlledTab ?? internalTab;
-  const setActiveTab = (t: TabType) => { setInternalTab(t); onTabChange?.(t); };
+  const setActiveTab = (tab: TabType) => {
+    setInternalTab(tab);
+    onTabChange?.(tab);
+  };
+  const tabRefs = useRef<Partial<Record<TabType, HTMLButtonElement>>>({});
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const { user, login } = useAuth();
-
-  const handleUpdateCategories = (categories: BudgetCategory[], newTotalBudget?: number) => {
-    onUpdatePlan({ ...plan, budget: categories }, newTotalBudget);
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+  const keyboard = (event: React.KeyboardEvent<HTMLButtonElement>, id: TabType) => {
+    const index = tabs.findIndex((tab) => tab.id === id);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : ['ArrowRight', 'ArrowDown'].includes(event.key)
+            ? (index + 1) % tabs.length
+            : ['ArrowLeft', 'ArrowUp'].includes(event.key)
+              ? (index + tabs.length - 1) % tabs.length
+              : undefined;
+    if (next === undefined) return;
+    event.preventDefault();
+    const tab = tabs[next];
+    if (tab) {
+      setActiveTab(tab.id);
+      tabRefs.current[tab.id]?.focus();
+    }
   };
-
-  const handleToggleMilestone = (id: string) => {
-    const updated = plan.timeline.map((m) => (m.id === id ? { ...m, completed: !m.completed } : m));
-    onUpdatePlan({ ...plan, timeline: updated });
-  };
-
-  const handleUpdateVendor = (id: string, updates: Partial<Vendor>) => {
-    const updated = plan.vendors.map((v) => (v.id === id ? { ...v, ...updates } : v));
-    onUpdatePlan({ ...plan, vendors: updated });
-  };
-
-  const handleUpdateIdeas = (ideas: Idea[]) => {
-    onUpdatePlan({ ...plan, ideas });
-  };
-
-  const budgetTotals = calculateBudgetTotals(plan.budget, input.totalBudget);
-  const tradeoffs = budgetTotals.isOverBudget
-    ? suggestTradeoffs(plan.budget, input.totalBudget, budgetTotals.overBudgetAmount)
-    : [];
-
-  const tabs: Array<{ id: TabType; label: string; icon: string }> = [
-    { id: 'budget', label: 'Budget Planner', icon: '💰' },
-    { id: 'timeline', label: 'Timeline & Milestones', icon: '⏳' },
-    { id: 'vendors', label: 'Vendor Checklist', icon: '🤝' },
-    { id: 'ideas', label: 'Personalized Ideas', icon: '✨' },
-    { id: 'runsheet', label: 'Day-of Run Sheet', icon: '📋' },
-  ];
-
   return (
-    <div className="container" style={{ padding: '2rem 1.25rem' }}>
-      {/* Guest Mode Persistence Prompt */}
-      {!user && (
-        <div
-          role="region"
+    <main id="main" className="container dashboard dashboard-stack">
+      {!user && !readOnly && (
+        <section
           aria-label="Guest session notification"
           data-testid="guest-save-prompt"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255, 111, 0, 0.08) 0%, rgba(194, 24, 91, 0.08) 100%)',
-            border: '1px solid var(--primary-saffron)',
-            color: 'var(--text-main)',
-            padding: '0.85rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '0.75rem',
-          }}
+          className="dashboard-card dashboard-row dashboard-between"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.25rem' }}>💾</span>
-            <span style={{ fontSize: '0.92rem', fontWeight: 600 }}>
-              Guest mode: Your celebration plan is saved on this browser. Sign in to save across devices.
-            </span>
-          </div>
+          <p>
+            Guest mode: Your celebration plan is saved on this browser. Sign in to save across
+            devices.
+          </p>
           <button
             type="button"
-            onClick={login}
-            style={{
-              padding: '0.45rem 1rem',
-              fontSize: '0.875rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              background: 'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
-              color: '#ffffff',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(230, 81, 0, 0.25)',
+            className="dashboard-button"
+            onClick={() => {
+              void login();
             }}
           >
             Sign in to save across devices
           </button>
-        </div>
+        </section>
       )}
-      {/* Over-budget tradeoff alert */}
-      {tradeoffs.length > 0 && (
-        <div
-          role="alert"
-          aria-label="Budget tradeoff suggestions"
-          style={{
-            background: 'rgba(194, 24, 91, 0.06)',
-            border: '1px solid var(--primary-magenta)',
-            color: 'var(--text-main)',
-            padding: '1rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>⚠️</span>
-            <strong style={{ fontSize: '0.95rem' }}>
-              You are ₹{budgetTotals.overBudgetAmount.toLocaleString('en-IN')} over budget. Here are 3 ways to fix it:
-            </strong>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-            {tradeoffs.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => onUpdatePlan({ ...plan, budget: opt.updatedCategories }, opt.newTotal)}
-                style={{
-                  padding: '0.45rem 0.9rem',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--primary-magenta)',
-                  background: 'transparent',
-                  color: 'var(--primary-magenta)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                title={opt.description}
-              >
-                {opt.label} (saves ₹{opt.savings.toLocaleString('en-IN')})
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Fallback notification if Gemini hit quota / network issues */}
       {isFallback && (
-        <div
-          role="status"
-          style={{
-            background: 'rgba(255, 179, 0, 0.12)',
-            border: '1px solid var(--primary-gold)',
-            color: 'var(--text-main)',
-            padding: '0.75rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.9rem',
-          }}
-        >
-          <span>
-            ℹ️ Showing curated expert defaults for {input.city} {input.eventType}. You can customize
-            everything below!
-          </span>
-        </div>
+        <p role="status" className="dashboard-card">
+          Showing curated expert defaults for {input.city} {input.eventType}. You can customize
+          everything below!
+        </p>
       )}
-
-      {/* Plan Header Card */}
-      <div
-        style={{
-          background: 'var(--surface-card)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--surface-border)',
-          padding: '1.75rem',
-          marginBottom: '2rem',
-          boxShadow: 'var(--surface-shadow)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1.25rem',
-        }}
-      >
-        <div style={{ maxWidth: '680px' }}>
-          {/* Event KPI chips */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
-            {[
-              { icon: '🎉', label: input.eventType.charAt(0).toUpperCase() + input.eventType.slice(1), color: 'var(--primary-saffron)' },
-              { icon: '🗺️', label: input.city, color: 'var(--primary-magenta)' },
-              { icon: '👥', label: `${input.guestCount.toLocaleString('en-IN')} guests`, color: 'var(--primary-emerald)' },
-              { icon: '📅', label: input.eventDate, color: 'var(--primary-saffron)' },
-              ...(input.subEvents.length > 0 ? [{ icon: '🎊', label: `${input.subEvents.length} ceremonies`, color: 'var(--primary-magenta)' }] : []),
-              ...(input.language === 'hindi' ? [{ icon: '🇮🇳', label: 'Hindi Output', color: 'var(--primary-emerald)' }] : []),
-            ].map((chip) => (
-              <span key={chip.label} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                fontSize: '0.78rem', fontWeight: 600,
-                background: 'rgba(0,0,0,0.04)',
-                border: '1px solid var(--surface-border)',
-                padding: '0.2rem 0.6rem',
-                borderRadius: 'var(--radius-full)',
-                color: chip.color,
-              }}>
-                {chip.icon} {chip.label}
-              </span>
-            ))}
-          </div>
-
-          <p
-            style={{
-              fontSize: '1.1rem',
-              fontWeight: 600,
-              lineHeight: 1.5,
-              color: 'var(--text-main)',
-              margin: 0,
-            }}
-          >
-            {plan.summary}
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => setIsShareOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.65rem 1.25rem',
-              fontSize: '0.95rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              background:
-                'linear-gradient(135deg, var(--primary-saffron) 0%, var(--primary-magenta) 100%)',
-              color: '#ffffff',
-              cursor: 'pointer',
-              boxShadow: '0 4px 10px rgba(230, 81, 0, 0.3)',
-            }}
-          >
-            <span>🔗</span> Share Plan
-          </button>
-
-          <button
-            type="button"
-            onClick={onNewPlan}
-            style={{
-              padding: '0.65rem 1rem',
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--surface-border)',
-              background: 'var(--surface-card-hover)',
-              color: 'var(--text-main)',
-              cursor: 'pointer',
-            }}
-          >
-            New Plan
-          </button>
-        </div>
-      </div>
-
-      {/* 4 Tab Navigation */}
-      <div
-        role="tablist"
-        aria-label="Celebration Plan Features"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '0.75rem',
-          marginBottom: '2rem',
-        }}
-      >
-        {tabs.map((t) => {
-          const isSelected = activeTab === t.id;
-          return (
-            <button
-              key={t.id}
-              id={`tab-${t.id}`}
-              role="tab"
-              aria-selected={isSelected}
-              aria-controls={`panel-${t.id}`}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                padding: '0.9rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                border: isSelected
-                  ? '2px solid var(--primary-saffron)'
-                  : '1px solid var(--surface-border)',
-                background: isSelected ? 'var(--surface-card-hover)' : 'var(--surface-card)',
-                boxShadow: isSelected ? '0 4px 12px rgba(230, 81, 0, 0.15)' : 'none',
-                color: isSelected ? 'var(--primary-saffron)' : 'var(--text-main)',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span aria-hidden="true">{t.icon}</span>
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active Tab Content */}
-      {tabs.map((t) => (
-        <div
-          key={t.id}
-          id={`panel-${t.id}`}
-          role="tabpanel"
-          aria-labelledby={`tab-${t.id}`}
-          hidden={activeTab !== t.id}
-        >
-          {activeTab === t.id && (
+      <section className="dashboard-card">
+        <h1 id="plan-title" ref={titleRef} tabIndex={-1}>
+          {readOnly ? 'Shared celebration plan' : 'Your celebration plan'}
+        </h1>
+        <p>{plan.summary}</p>
+        <p>
+          {input.eventType} · {input.city} · {input.guestCount.toLocaleString('en-IN')} guests ·{' '}
+          {input.eventDate}
+          {input.subEvents.length > 0 && ` · ${input.subEvents.join(', ')}`}
+          {input.language === 'hindi' && ' · Hindi Output'}
+        </p>
+        <div className="dashboard-row">
+          {!readOnly && (
             <>
-              {t.id === 'budget' && (
-                <BudgetTab
-                  categories={plan.budget}
-                  totalBudget={input.totalBudget}
-                  onUpdateCategories={handleUpdateCategories}
-                />
-              )}
-              {t.id === 'timeline' && (
-                <TimelineTab
-                  milestones={plan.timeline}
-                  eventDate={input.eventDate}
-                  onToggleMilestone={handleToggleMilestone}
-                />
-              )}
-              {t.id === 'vendors' && (
-                <VendorsTab
-                  vendors={plan.vendors}
-                  city={input.city}
-                  onUpdateVendor={handleUpdateVendor}
-                />
-              )}
-              {t.id === 'ideas' && (
-                <IdeasTab
-                  ideas={plan.ideas}
-                  input={input}
-                  currentPlan={plan}
-                  onUpdateIdeas={handleUpdateIdeas}
-                />
-              )}
-              {t.id === 'runsheet' && (
-                <RunSheetTab eventType={input.eventType} eventDate={input.eventDate} />
-              )}
+              <button
+                type="button"
+                className="dashboard-button dashboard-button--primary"
+                onClick={() => {
+                  setIsShareOpen(true);
+                }}
+              >
+                🔗 Share Plan
+              </button>
+              <button type="button" className="dashboard-button" onClick={onNewPlan}>
+                New Plan
+              </button>
             </>
+          )}
+          <button
+            type="button"
+            className="dashboard-button"
+            onClick={() => {
+              window.print();
+            }}
+          >
+            Print summary
+          </button>
+        </div>
+      </section>
+      {!readOnly && (
+        <>
+          <AssistantPanel plan={plan} input={input} onNavigate={setActiveTab} />
+          <TradeoffSuggestions
+            plan={plan}
+            totalBudget={input.totalBudget}
+            onUpdate={onUpdatePlan}
+          />
+        </>
+      )}
+      <div role="tablist" aria-label="Celebration Plan Features" className="dashboard-tabs">
+        {tabs.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            id={`tab-${tab.id}`}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            className="dashboard-button"
+            ref={(element) => {
+              if (element) tabRefs.current[tab.id] = element;
+            }}
+            onClick={() => {
+              setActiveTab(tab.id);
+            }}
+            onKeyDown={(event) => {
+              keyboard(event, tab.id);
+            }}
+          >
+            <span aria-hidden="true">{tab.icon}</span> {tab.label}
+          </button>
+        ))}
+      </div>
+      {tabs.map((tab) => (
+        <div
+          key={tab.id}
+          id={`panel-${tab.id}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${tab.id}`}
+          hidden={activeTab !== tab.id}
+        >
+          {activeTab === tab.id && (
+            <DashboardPanel
+              tab={tab.id}
+              plan={plan}
+              input={input}
+              onUpdatePlan={onUpdatePlan}
+              readOnly={readOnly}
+            />
           )}
         </div>
       ))}
-
-      {/* Share Modal */}
-      <ShareModal
-        input={input}
-        plan={plan}
-        isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-      />
-    </div>
+      <PrintSummary plan={plan} input={input} />
+      {isShareOpen && !readOnly && (
+        <Suspense fallback={<p role="status">Opening share options…</p>}>
+          <ShareModal
+            input={input}
+            plan={plan}
+            isOpen
+            onClose={() => {
+              setIsShareOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
+    </main>
   );
-};
+});

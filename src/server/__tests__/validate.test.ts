@@ -17,6 +17,11 @@ const schema = z.object({
   age: z.number().int().positive(),
 });
 
+const validationErrorSchema = z.object({
+  error: z.string(),
+  details: z.array(z.object({ path: z.string(), message: z.string() })),
+});
+
 describe('validateBody middleware', () => {
   it('calls next() when body matches the schema', () => {
     const { req, res, next } = makeReqResNext({ name: 'Alice', age: 25 });
@@ -36,9 +41,9 @@ describe('validateBody middleware', () => {
     validateBody(schema)(req, res, next);
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(400);
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Validation failed', details: expect.any(Array) }),
-    );
+    const payload = validationErrorSchema.parse(json.mock.calls[0]?.[0]);
+    expect(payload.error).toBe('Validation failed');
+    expect(payload.details.length).toBeGreaterThan(0);
   });
 
   it('returns 400 for empty body {}', () => {
@@ -52,7 +57,7 @@ describe('validateBody middleware', () => {
     const { req, res, next, status, json } = makeReqResNext({ name: '', age: 25 });
     validateBody(schema)(req, res, next);
     expect(status).toHaveBeenCalledWith(400);
-    const payload = json.mock.calls[0][0] as { details: Array<{ path: string; message: string }> };
+    const payload = validationErrorSchema.parse(json.mock.calls[0]?.[0]);
     expect(payload.details.some((d) => d.path === 'name')).toBe(true);
   });
 
@@ -79,9 +84,9 @@ describe('validateBody middleware', () => {
   it('includes nested field path when nested validation fails', () => {
     const nested = z.object({ user: z.object({ uid: z.string().min(1) }) });
     const { req, res, json, status } = makeReqResNext({ user: { uid: '' } });
-    validateBody(nested)(req, res, vi.fn() as unknown as NextFunction);
+    validateBody(nested)(req, res, vi.fn());
     expect(status).toHaveBeenCalledWith(400);
-    const payload = json.mock.calls[0][0] as { details: Array<{ path: string }> };
-    expect(payload.details[0].path).toContain('uid');
+    const payload = validationErrorSchema.parse(json.mock.calls[0]?.[0]);
+    expect(payload.details[0]?.path).toContain('uid');
   });
 });

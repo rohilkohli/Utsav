@@ -21,7 +21,7 @@ export interface PlaceSuggestion {
 }
 
 // Maps common vendor category keywords to better Indian-context search terms
-const CATEGORY_QUERY_MAP: Array<[RegExp, string]> = [
+const CATEGORY_QUERY_MAP: [RegExp, string][] = [
   [/photog/i, 'wedding photographer'],
   [/videograph/i, 'wedding videographer'],
   [/cater/i, 'wedding catering service'],

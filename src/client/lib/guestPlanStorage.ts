@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { planOutputSchema, wizardInputSchema } from '../../shared/schemas.js';
 import type { PlanOutput, WizardInput } from '../../shared/schemas.js';
 
 export interface StoredGuestPlan {
@@ -35,11 +37,15 @@ export function loadGuestPlan(): StoredGuestPlan | null {
   try {
     const raw = localStorage.getItem(GUEST_PLAN_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredGuestPlan;
-    if (parsed && parsed.planId && parsed.input && parsed.plan) {
-      return parsed;
-    }
-    return null;
+    const result = z
+      .object({
+        planId: z.string().min(1),
+        input: wizardInputSchema,
+        plan: planOutputSchema,
+        updatedAt: z.string(),
+      })
+      .safeParse(JSON.parse(raw) as unknown);
+    return result.success ? result.data : null;
   } catch {
     return null;
   }

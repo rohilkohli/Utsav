@@ -1,0 +1,154 @@
+.review-step-div-1 {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.review-step-h2-2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.review-step-p-3 {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.review-step-div-4 {
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+.review-step-span-5 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-6 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.review-step-span-7 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-8 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.review-step-span-9 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-10 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.review-step-span-11 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-12 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-saffron);
+}
+.review-step-div-13 {
+  grid-column: 1 / -1;
+}
+.review-step-span-14 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.review-step-div-15 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.review-step-span-16 {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  background: rgba(194, 24, 91, 0.08);
+  color: var(--primary-magenta);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+.review-step-div-17 {
+  grid-column: 1 / -1;
+}
+.review-step-span-18 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-19 {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.review-step-div-20 {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.review-step-span-21 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-22 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.review-step-span-23 {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+}
+.review-step-span-24 {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.review-step-div-25 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.review-step-button-26-cursor-yes {
+  cursor: not-allowed;
+}
+.review-step-button-26-cursor-no {
+  cursor: pointer;
+}
+.review-step-button-26-opacity-yes {
+  opacity: 0.8;
+}
+.review-step-button-26-opacity-no {
+  opacity: 1;
+}
+.review-step-button-26 {
+  padding: 1rem 2.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  border: none;
+  background: linear-gradient(135deg, var(--action-saffron) 0%, var(--action-magenta) 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 20px -5px rgba(230, 81, 0, 0.4);
+  transition: all 0.2s ease;
+}
+.review-step-p-27 {
+  font-size: 0.9rem;
+  color: var(--primary-saffron);
+  font-weight: 500;
+}

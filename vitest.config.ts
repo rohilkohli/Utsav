@@ -11,20 +11,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    environmentMatchGlobs: [
-      ['src/client/**', 'jsdom'],
-    ],
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
     setupFiles: ['src/client/__tests__/setup.ts'],
-    // 'forks' pool with singleFork avoids jsdom Worker-thread memory leaks in CI.
-    // Threads share one heap and the jsdom environment accumulates until OOM after ~5h.
-    // A single forked process runs tests sequentially in its own address space.
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 2,
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // After all tests complete, wait at most 5 s for open handles (e.g. Firebase
@@ -32,13 +22,15 @@ export default defineConfig({
     teardownTimeout: 5_000,
     coverage: {
       provider: 'v8',
-      include: ['src/shared/**/*.ts', 'src/server/**/*.ts'],
-      exclude: ['**/__tests__/**', '**/*.d.ts'],
+      include: ['src/client/**/*.{ts,tsx}', 'src/shared/**/*.ts', 'src/server/**/*.ts'],
+      exclude: ['src/client/main.tsx', '**/__tests__/**', '**/*.d.ts'],
+      reporter: ['text', 'json-summary', 'html'],
       thresholds: {
-        statements: 90,
-        branches: 85,
-        functions: 90,
-        lines: 90,
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
+        'src/shared/**/*.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },

@@ -1,0 +1,29 @@
+.voice-status {
+  background: var(--text-muted);
+}
+.voice-status--connecting {
+  background: var(--warning-text);
+}
+.voice-status--ready,
+.voice-status--listening {
+  background: var(--success-text);
+}
+.voice-status--speaking {
+  background: var(--primary-saffron);
+}
+.voice-level {
+  width: calc(100% - 2rem);
+  margin: 0 1rem;
+}
+.voice-panel {
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 7rem);
+}
+.voice-transcript {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .uv-ring {
+    animation: none;
+  }
+}

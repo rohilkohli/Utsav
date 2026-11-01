@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { z } from 'zod';
 import type { Server } from 'http';
 import { createApp } from '../index.js';
 import { setCachedPlan, getCachedPlan, createPlanCacheKey } from '../services/cache.js';
@@ -6,23 +7,64 @@ import { savePlanToDb, getPlanFromDb } from '../services/firestore.js';
 import { getShareRepository, InMemoryRepository } from '../repositories/index.js';
 import { setTokenVerifier } from '../middleware/auth.js';
 import { refineIdeasSection } from '../services/gemini.js';
-import { savedPlanSchema } from '../../shared/schemas.js';
+import {
+  generatePlanResponseSchema,
+  publicConfigSchema,
+  refineSectionResponseSchema,
+  savedPlanSchema,
+} from '../../shared/schemas.js';
 import type { SavedPlan, WizardInput, PlanOutput } from '../../shared/schemas.js';
+
+const firebase = vi.hoisted(() => ({ verifyIdToken: vi.fn() }));
+vi.mock('firebase-admin', () => ({
+  default: { apps: [{}], auth: () => ({ verifyIdToken: firebase.verifyIdToken }) },
+}));
+const errorSchema = z.object({ error: z.string() });
+const healthSchema = z.object({ status: z.string(), time: z.string() });
+const shareSchema = z.object({
+  shareToken: z.string(),
+  shareUrl: z.string(),
+  expiresAt: z.string(),
+});
+const generatedSchema = generatePlanResponseSchema.extend({ planId: z.string() });
+const updateSchema = z.object({ success: z.boolean(), plan: savedPlanSchema });
+async function readJson<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  const body: unknown = await response.json();
+  return schema.parse(body);
+}
 
 describe('Server API & Services Integration', () => {
   let server: Server;
   let baseUrl: string;
+  let originalFetch: typeof fetch;
 
   beforeAll(async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'your-gemini-api-key-here');
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
+      const method = (
+        init?.method ?? (input instanceof Request ? input.method : 'GET')
+      ).toUpperCase();
+      if (method !== 'POST' && method !== 'PUT') return originalFetch(input, init);
+      const headers = new Headers(
+        init?.headers ?? (input instanceof Request ? input.headers : undefined),
+      );
+      if (!headers.has('Origin')) headers.set('Origin', requestUrl.origin);
+      return originalFetch(input, { ...init, headers });
+    };
+
     // Inject mock TokenVerifier for integration tests
-    setTokenVerifier(async (token: string) => {
+    setTokenVerifier((token: string) => {
       if (token.startsWith('test-token-')) {
         const uid = token.replace('test-token-', '').trim();
         if (uid.length > 0) {
-          return { uid, email: `${uid}@test.local` };
+          return Promise.resolve({ uid, email: `${uid}@test.local` });
         }
       }
-      return null;
+      return Promise.resolve(null);
     });
 
     const app = createApp();
@@ -38,15 +80,19 @@ describe('Server API & Services Integration', () => {
   });
 
   afterAll(async () => {
+    globalThis.fetch = originalFetch;
+    vi.unstubAllEnvs();
     await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+      server.close(() => {
+        resolve();
+      });
     });
   });
 
   it('GET /api/health returns 200 ok', async () => {
     const res = await fetch(`${baseUrl}/api/health`);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res, healthSchema);
     expect(body.status).toBe('ok');
     expect(body.time).toBeDefined();
   });
@@ -54,7 +100,7 @@ describe('Server API & Services Integration', () => {
   it('GET /api/config returns runtime public Firebase configuration', async () => {
     const res = await fetch(`${baseUrl}/api/config`);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res, publicConfigSchema);
     expect(body.firebase).toBeDefined();
     expect(typeof body.firebase.apiKey).toBe('string');
   });
@@ -82,7 +128,7 @@ describe('Server API & Services Integration', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res, generatedSchema);
     expect(body.plan).toBeDefined();
     expect(body.planId).toBeDefined();
     expect(body.meta).toBeDefined();
@@ -124,7 +170,7 @@ describe('Server API & Services Integration', () => {
     });
 
     expect(resA.status).toBe(200);
-    const bodyA = await resA.json();
+    const bodyA = await readJson(resA, generatedSchema);
     const planId = bodyA.planId;
     expect(planId).toBeDefined();
 
@@ -133,7 +179,7 @@ describe('Server API & Services Integration', () => {
       headers: { Authorization: 'Bearer test-token-userA' },
     });
     expect(getResA.status).toBe(200);
-    const savedPlan = await getResA.json();
+    const savedPlan = await readJson(getResA, savedPlanSchema);
     expect(savedPlan.id).toBe(planId);
     expect(savedPlan.ownerUid).toBe('userA');
     expect(savedPlanSchema.safeParse(savedPlan).success).toBe(true);
@@ -210,7 +256,7 @@ describe('Server API & Services Integration', () => {
       }),
     });
     expect(validPut.status).toBe(200);
-    const updatedBody = await validPut.json();
+    const updatedBody = await readJson(validPut, updateSchema);
     expect(updatedBody.success).toBe(true);
     expect(updatedBody.plan.plan.summary).toBe('Updated Royal Palace Evening celebration');
     expect(updatedBody.plan.ownerUid).toBe('userA');
@@ -223,32 +269,32 @@ describe('Server API & Services Integration', () => {
     expect(res.status).toBe(404);
   });
 
-  // Skipped in CI: requires real Firebase credentials — the real SDK's gRPC keep-alive
-  // holds the process open for ~20 minutes if no credentials are present.
-  it.skipIf(!!process.env.CI)('rejects "test-token" string with 401 when NODE_ENV=production using real production verifier', async () => {
+  it('rejects invalid tokens through the default production SDK verifier', async () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     // Reset to default production verifier (strictly calls admin.auth().verifyIdToken())
     setTokenVerifier(null);
+    firebase.verifyIdToken.mockRejectedValueOnce(new Error('Token signature rejected'));
 
     try {
       const res = await fetch(`${baseUrl}/api/plan/any_plan_uuid`, {
         headers: { Authorization: 'Bearer test-token-userA' },
       });
       expect(res.status).toBe(401);
-      const body = await res.json();
+      const body = await readJson(res, errorSchema);
       expect(body.error).toContain('Unauthorized');
+      expect(firebase.verifyIdToken).toHaveBeenCalledWith('test-token-userA');
     } finally {
       process.env.NODE_ENV = originalEnv;
       // Restore test verifier for other tests
-      setTokenVerifier(async (token: string) => {
+      setTokenVerifier((token: string) => {
         if (token.startsWith('test-token-')) {
           const uid = token.replace('test-token-', '').trim();
           if (uid.length > 0) {
-            return { uid, email: `${uid}@test.local` };
+            return Promise.resolve({ uid, email: `${uid}@test.local` });
           }
         }
-        return null;
+        return Promise.resolve(null);
       });
     }
   });
@@ -261,7 +307,7 @@ describe('Server API & Services Integration', () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await res.json();
+    const body = await readJson(res, errorSchema);
     expect(body.error).toBe('Validation failed');
   });
 
@@ -293,7 +339,7 @@ describe('Server API & Services Integration', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res, refineSectionResponseSchema);
     expect(body.ideas).toBeDefined();
     expect(body.meta).toBeDefined();
     expect(['gemini', 'fallback']).toContain(body.meta.source);
@@ -332,7 +378,7 @@ describe('Server API & Services Integration', () => {
     });
 
     expect(shareRes.status).toBe(200);
-    const shareBody = await shareRes.json();
+    const shareBody = await readJson(shareRes, shareSchema);
     expect(shareBody.shareToken).toBeDefined();
     expect(shareBody.shareToken.length).toBe(32); // 16 bytes in hex = 32 chars
     expect(shareBody.shareUrl).toContain(shareBody.shareToken);
@@ -340,7 +386,7 @@ describe('Server API & Services Integration', () => {
     // Retrieve via GET /api/share/:token
     const getRes = await fetch(`${baseUrl}/api/share/${shareBody.shareToken}`);
     expect(getRes.status).toBe(200);
-    const getBody = await getRes.json();
+    const getBody = await readJson(getRes, savedPlanSchema);
     expect(getBody.plan.summary).toBe('A fun party in Pune');
 
     // Assert the JSON response parses cleanly with the shared transport schema
@@ -391,7 +437,7 @@ describe('Server API & Services Integration', () => {
 
     const res = await fetch(`${baseUrl}/api/share/${expiredToken}`);
     expect(res.status).toBe(404);
-    const body = await res.json();
+    const body = await readJson(res, errorSchema);
     expect(body.error).toContain('expired');
   });
 
@@ -456,7 +502,7 @@ describe('Server API & Services Integration', () => {
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      expiresAt: '2099-12-31T23:59:59Z' as unknown as Date, // Plain string instead of Timestamp/Date
+      expiresAt: '2099-12-31T23:59:59Z', // Plain string instead of Timestamp/Date
     });
 
     const res = await fetch(`${baseUrl}/api/share/${corruptToken}`);

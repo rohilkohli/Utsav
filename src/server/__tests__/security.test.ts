@@ -2,19 +2,22 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'http';
 import { createApp } from '../index.js';
 import { setTokenVerifier } from '../middleware/auth.js';
+import { z } from 'zod';
 
 describe('Security Headers & Rate Limiting', () => {
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    setTokenVerifier(async (token: string) => {
-      if (token.startsWith('test-token-')) {
-        const uid = token.replace('test-token-', '').trim();
-        if (uid.length > 0) return { uid, email: `${uid}@test.local` };
-      }
-      return null;
-    });
+    setTokenVerifier((token: string) =>
+      Promise.resolve().then(() => {
+        if (token.startsWith('test-token-')) {
+          const uid = token.replace('test-token-', '').trim();
+          if (uid.length > 0) return { uid, email: `${uid}@test.local` };
+        }
+        return null;
+      }),
+    );
 
     const app = createApp();
     await new Promise<void>((resolve) => {
@@ -30,7 +33,9 @@ describe('Security Headers & Rate Limiting', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+      server.close(() => {
+        resolve();
+      });
     });
   });
 
@@ -52,10 +57,10 @@ describe('Security Headers & Rate Limiting', () => {
       expect(csp).toContain("object-src 'none'");
     });
 
-    it('CSP connect-src allows Gemini Live WebSocket (wss://)', async () => {
+    it('CSP connect-src does not expose the upstream Gemini WebSocket', async () => {
       const res = await fetch(`${baseUrl}/api/health`);
       const csp = res.headers.get('content-security-policy') ?? '';
-      expect(csp).toContain('wss://generativelanguage.googleapis.com');
+      expect(csp).not.toContain('wss://generativelanguage.googleapis.com');
     });
 
     it('CSP frame-src allows Google accounts for OAuth popup', async () => {
@@ -84,31 +89,27 @@ describe('Security Headers & Rate Limiting', () => {
   });
 
   describe('Voice session endpoint', () => {
-    it('GET /api/voice/session returns 503 when GEMINI_API_KEY is not set', async () => {
-      const saved = process.env.GEMINI_API_KEY;
-      delete process.env.GEMINI_API_KEY;
-      try {
-        const res = await fetch(`${baseUrl}/api/voice/session`);
-        expect(res.status).toBe(503);
-        const body = await res.json();
-        expect(body.error).toMatch(/not configured/i);
-      } finally {
-        if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
-      }
-    });
-
-    it('GET /api/voice/session returns 200 with apiKey when GEMINI_API_KEY is set', async () => {
+    it('GET /api/voice/session never returns the configured API key', async () => {
       const saved = process.env.GEMINI_API_KEY;
       process.env.GEMINI_API_KEY = 'test-api-key-12345';
       try {
         const res = await fetch(`${baseUrl}/api/voice/session`);
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.apiKey).toBe('test-api-key-12345');
+        expect(res.status).toBe(410);
+        const body: unknown = await res.json();
+        expect(JSON.stringify(body)).not.toContain('test-api-key-12345');
       } finally {
         if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
         else delete process.env.GEMINI_API_KEY;
       }
+    });
+
+    it('mutating API requests require a same-origin JSON request', async () => {
+      const missingOrigin = await fetch(`${baseUrl}/api/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: {} }),
+      });
+      expect(missingOrigin.status).toBe(403);
     });
   });
 
@@ -116,18 +117,18 @@ describe('Security Headers & Rate Limiting', () => {
     it('POST /api/plan with missing required fields returns 400 validation error', async () => {
       const res = await fetch(`${baseUrl}/api/plan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: baseUrl },
         body: JSON.stringify({ input: {} }),
       });
       expect(res.status).toBe(400);
-      const body = await res.json();
+      const body = z.object({ error: z.string() }).parse((await res.json()) as unknown);
       expect(body.error).toBeTruthy();
     });
 
     it('POST /api/plan with negative budget returns 400', async () => {
       const res = await fetch(`${baseUrl}/api/plan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: baseUrl },
         body: JSON.stringify({
           input: {
             eventType: 'birthday',
@@ -149,7 +150,7 @@ describe('Security Headers & Rate Limiting', () => {
     it('POST /api/plan with negative guest count returns 400', async () => {
       const res = await fetch(`${baseUrl}/api/plan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: baseUrl },
         body: JSON.stringify({
           input: {
             eventType: 'birthday',
