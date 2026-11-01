@@ -1,13 +1,16 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { planOutputSchema, wizardInputSchema } from '../../shared/schemas.js';
+import { planOutputSchema, storedWizardInputSchema } from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
 import { generationLimiter } from '../middleware/rateLimit.js';
 import { reviewPlan } from '../services/gemini.js';
 import { runAiResponse } from './aiResponse.js';
 
 const router = Router();
-const reviewPlanRequestSchema = z.object({ plan: planOutputSchema, input: wizardInputSchema });
+const reviewPlanRequestSchema = z.object({
+  plan: planOutputSchema,
+  input: storedWizardInputSchema,
+});
 router.post(
   '/review-plan',
   generationLimiter,

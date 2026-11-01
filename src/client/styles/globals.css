@@ -451,10 +451,10 @@ button,
   background: var(--surface-card-hover);
 }
 .voice-message--tool .voice-message__bubble {
-  border: 1px dashed #10b981;
+  border: 1px dashed var(--success-border);
   border-radius: 8px;
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: var(--success-bg);
+  color: var(--success-text);
   font-family: monospace;
 }
 .voice-message--system .voice-message__bubble {

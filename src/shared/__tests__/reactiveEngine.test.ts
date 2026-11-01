@@ -213,11 +213,13 @@ describe('tradeoff integrity', () => {
     const options = suggestTradeoffs(initial, 350, 100);
     expect(options).toHaveLength(3);
     for (const option of options) {
-      expect(option.savings).toBe(450 - option.newTotal);
+      expect(option.savings).toBe(450 - option.newTotalActual);
       expect(option.updatedCategories.reduce((sum, entry) => sum + entry.actual, 0)).toBe(
-        option.newTotal,
+        option.newTotalActual,
       );
-      expect(option.newTotal).toBeLessThanOrEqual(350);
+      expect(option.newTotal).toBe(350);
+      expect(option.feasible).toBe(option.newTotalActual <= 350);
+      expect(option.uncoveredShortfall).toBe(Math.max(0, option.newTotalActual - 350));
       expect(option.updatedCategories[2]?.actual).toBe(150);
     }
     expect(
@@ -235,8 +237,11 @@ describe('tradeoff integrity', () => {
   it('reports the actual residual if commitments exceed the target budget', () => {
     const initial = [{ ...category('Venue', 200), locked: true }, category('Food', 100)];
     for (const option of suggestTradeoffs(initial, 100, 200)) {
-      expect(option.newTotal).toBe(200);
-      expect(option.savings).toBe(100);
+      expect(option.newTotal).toBe(100);
+      expect(option.newTotalActual).toBeGreaterThanOrEqual(200);
+      expect(option.savings).toBe(300 - option.newTotalActual);
+      expect(option.uncoveredShortfall).toBe(option.newTotalActual - 100);
+      expect(option.feasible).toBe(false);
     }
   });
 });

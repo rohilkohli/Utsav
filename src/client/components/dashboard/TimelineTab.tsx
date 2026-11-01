@@ -1,19 +1,14 @@
 import { memo, useMemo } from 'react';
-import type { Milestone } from '@shared/schemas';
+import type { Milestone, TimelineCompression } from '@shared/schemas';
 import { getTodayInKolkata } from '@shared/schemas';
-import {
-  affectedByDelays,
-  buildSchedule,
-  compressTasks,
-  getCountdownToEvent,
-  phaseFor,
-} from '@shared/timeline';
+import { buildSchedule, getCountdownToEvent, phaseFor, propagateDelay } from '@shared/timeline';
 import { generateICS, createGoogleCalendarUrl } from '@shared/ics';
 import './dashboard.css';
 interface TimelineTabProps {
   milestones: Milestone[];
   eventDate: string;
   today?: string;
+  compression?: TimelineCompression;
   onToggleMilestone: (id: string) => void;
   onUpdateMilestones?: (milestones: Milestone[]) => void;
 }
@@ -21,6 +16,7 @@ export const TimelineTab = memo(function TimelineTab({
   milestones,
   eventDate,
   today = getTodayInKolkata(),
+  compression,
   onToggleMilestone,
   onUpdateMilestones,
 }: TimelineTabProps) {
@@ -28,7 +24,8 @@ export const TimelineTab = memo(function TimelineTab({
   const schedule = useMemo(() => {
     try {
       return {
-        tasks: buildSchedule(compressTasks(milestones, eventDate, today), eventDate, today),
+        tasks: buildSchedule(milestones, eventDate, today),
+        compression,
         error: '',
       };
     } catch (error) {
@@ -37,11 +34,7 @@ export const TimelineTab = memo(function TimelineTab({
         error: error instanceof Error ? error.message : 'Invalid timeline dependencies',
       };
     }
-  }, [milestones, eventDate, today]);
-  const pushed = useMemo(
-    () => (schedule.error ? new Map<string, string[]>() : affectedByDelays(milestones)),
-    [milestones, schedule.error],
-  );
+  }, [milestones, compression, eventDate, today]);
   const completed = milestones.filter((m) => m.completed === true || m.status === 'done').length;
   const download = () => {
     const content = generateICS(
@@ -58,23 +51,9 @@ export const TimelineTab = memo(function TimelineTab({
     link.click();
     URL.revokeObjectURL(url);
   };
-  const delay = (id: string, days: number) =>
-    onUpdateMilestones?.(
-      milestones.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              delayDays: days,
-              status:
-                days > 0
-                  ? ('delayed' as const)
-                  : m.completed
-                    ? ('done' as const)
-                    : ('todo' as const),
-            }
-          : m,
-      ),
-    );
+  const delay = (id: string, days: number) => {
+    if (Number.isFinite(days)) onUpdateMilestones?.(propagateDelay(milestones, id, days));
+  };
   return (
     <div className="dashboard-stack">
       <section className="dashboard-card">
@@ -89,9 +68,14 @@ export const TimelineTab = memo(function TimelineTab({
           max={Math.max(1, milestones.length)}
         />
         <p className="dashboard-muted">
-          Tasks adapt to your available runway. Dependencies and delays update every task and
-          calendar export.
+          Dependencies and delays update every task and calendar export.
         </p>
+        {schedule.compression?.compressed && (
+          <p role="status" className="dashboard-warning">
+            Schedule compressed from {schedule.compression.originalSpanDays} to{' '}
+            {schedule.compression.availableDays} days of available planning time.
+          </p>
+        )}
         <button type="button" className="dashboard-button" onClick={download}>
           Export .ics Calendar
         </button>
@@ -117,7 +101,7 @@ export const TimelineTab = memo(function TimelineTab({
                 Due: <time dateTime={m.effectiveDate}>{m.effectiveDate}</time>
                 {m.assignee && ` · Owner: ${m.assignee}`}
               </p>
-              {(pushed.get(m.id) ?? []).map((title) => (
+              {m.pushedBy.map((title) => (
                 <p key={title} className="dashboard-warning">
                   ⚠ Pushed by delayed task: {title}
                 </p>
@@ -159,7 +143,10 @@ export const TimelineTab = memo(function TimelineTab({
                       min={0}
                       max={365}
                       value={m.delayDays ?? 0}
-                      onChange={(e) => delay(m.id, Math.max(0, Math.round(Number(e.target.value))))}
+                      disabled={m.completed === true || m.status === 'done'}
+                      onChange={(e) => {
+                        delay(m.id, Number(e.target.value));
+                      }}
                     />
                   </label>
                   <label className="dashboard-label">

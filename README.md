@@ -236,11 +236,11 @@ Start with the [budget engine](src/shared/budget.ts), [schedule engine](src/shar
 
 ## Quality you can check
 
-The [recorded upgrade validation](docs/UPGRADE_VALIDATION.md) passed **460 unit/integration tests** and **14 desktop/mobile browser checks**, including light/dark WCAG AA audits. These are recorded local results; the CI badge above reports GitHub's current workflow status.
+The [recorded upgrade validation](docs/UPGRADE_VALIDATION.md) passed **543 unit/integration tests** and **18 desktop/mobile browser checks**, including light/dark WCAG AA audits and populated voice transcripts. These are recorded local results; the CI badge above reports GitHub's current workflow status.
 
 | Recorded coverage      | Statements |  Lines | Functions | Branches |
 | :--------------------- | ---------: | -----: | --------: | -------: |
-| Full stack             |     96.30% | 97.31% |    95.17% |   90.29% |
+| Full stack             |     96.78% | 97.67% |    95.96% |   91.27% |
 | Shared planning engine |       100% |   100% |      100% |     100% |
 
 ```bash

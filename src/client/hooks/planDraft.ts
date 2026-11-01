@@ -4,6 +4,7 @@ export function loadAccountDraft(uid: string): SavedPlan | null {
   try {
     const raw = localStorage.getItem(key(uid));
     if (!raw) return null;
+    // Saved-plan validation permits past event dates while retaining owner and shape checks.
     const parsed = savedPlanSchema.safeParse(JSON.parse(raw) as unknown);
     return parsed.success && parsed.data.ownerUid === uid ? parsed.data : null;
   } catch {

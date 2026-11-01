@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { suggestTradeoffs } from '../tradeoffs.js';
 import type { BudgetCategory } from '../schemas.js';
+import { calculateBudgetTotals } from '../budget.js';
 
 const BASE_CATEGORIES: BudgetCategory[] = [
   { id: '1', category: 'Catering', suggestedPercent: 40, amount: 200_000, actual: 230_000 },
@@ -31,11 +32,18 @@ describe('suggestTradeoffs', () => {
     }
   });
 
-  it('uniform-cut option reduces total', () => {
+  it('uniform-cut meets the unchanged target exactly', () => {
     const options = suggestTradeoffs(BASE_CATEGORIES, TOTAL, OVER_BY);
     const uniformCut = options.find((o) => o.id === 'uniform-cut');
     expect(uniformCut).toBeDefined();
-    expect(uniformCut?.newTotal).toBeLessThan(TOTAL);
+    expect(uniformCut?.newTotal).toBe(TOTAL);
+    expect(uniformCut?.newTotalActual).toBe(TOTAL);
+    for (const option of options) {
+      expect(option.feasible).toBe(true);
+      expect(calculateBudgetTotals(option.updatedCategories, option.newTotal).isOverBudget).toBe(
+        false,
+      );
+    }
   });
 
   it('flex-cut option targets decoration/photography/return gifts', () => {

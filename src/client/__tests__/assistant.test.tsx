@@ -164,3 +164,16 @@ describe('planning assistant', () => {
     expect(await screen.findByText(/Plan review is currently unavailable/)).toBeVisible();
   });
 });
+
+it('dismisses a completed executive review and allows requesting a fresh one', async () => {
+  const user = userEvent.setup();
+  render(<AssistantPanel plan={plan} input={input} onNavigate={() => undefined} />);
+  await user.click(screen.getByRole('button', { name: 'Ask AI for a Plan Review' }));
+  expect(await screen.findByText('Good budget')).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Dismiss plan review' }));
+  expect(screen.queryByText('Good budget')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Dismiss plan review' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Ask AI for a Plan Review' })).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: 'Ask AI for a Plan Review' }));
+  expect(await screen.findByText('Good budget')).toBeVisible();
+});

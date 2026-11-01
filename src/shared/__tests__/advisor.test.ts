@@ -7,6 +7,7 @@ describe('live planning facts and bilingual answers', () => {
   it('answers every supported English and Hinglish topic from live facts', () => {
     const current = plan({
       perPlate: 200,
+      budget: [category('Food', 20000)],
       timeline: [task('last', 1), { ...task('done', 20), status: 'done' }, task('first', 10)],
     });
     expect(planFacts(current, input, today)).toMatchObject({
@@ -23,12 +24,27 @@ describe('live planning facts and bilingual answers', () => {
     expect(localAnswer('mehman', current, input, today)).toContain('₹20,000');
     expect(localAnswer('something else', current, input, today)).toContain('live plan');
     expect(localAnswer('budget', current, { ...input, totalBudget: 50 }, today)).toContain(
-      '₹50 is over budget',
+      '₹19,950 is over budget',
     );
     expect(localAnswer('when', current, { ...input, eventDate: '2029-01-01' }, today)).toContain(
       'passed',
     );
     expect(localAnswer('next', plan({ timeline: [] }), input, today)).toContain('complete');
+  });
+  it('uses current catering actuals for manual estimates and fixed quotations', () => {
+    const current = plan({
+      perPlate: 200,
+      budget: [
+        { ...category('Food', 100), actual: 500 },
+        { ...category('Catering', 100), actual: 1200, verified: true },
+        category('Prasad', 300),
+        category('Venue', 5000),
+      ],
+    });
+    expect(planFacts(current, input, today).requiredCatering).toBe(2000);
+    expect(localAnswer('guests', current, input, today)).toContain('₹2,000');
+    expect(localAnswer('guests', current, input, today)).not.toContain('per-plate rate');
+    expect(planFacts(plan({ budget: [] }), input, today).requiredCatering).toBe(0);
   });
   it('answers Devanagari topics and honors Hindi output mode', () => {
     const current = plan();

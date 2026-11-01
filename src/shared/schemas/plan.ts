@@ -67,7 +67,7 @@ export const milestoneSchema = z.object({
   durationDays: z.number().int().nonnegative().default(3),
   dependsOn: z.array(z.string()).default([]),
   status: z.enum(['todo', 'done', 'delayed']).default('todo'),
-  delayDays: z.number().int().nonnegative().optional(),
+  delayDays: z.number().int().min(0).max(365).optional(),
   assignee: z.string().optional(),
   subEvent: z.string().optional(),
   completed: z.boolean().default(false),
@@ -101,11 +101,21 @@ export const ideaSchema = z.object({
 });
 export type Idea = z.infer<typeof ideaSchema>;
 
+export const timelineCompressionSchema = z.object({
+  compressed: z.boolean(),
+  originalSpanDays: z.number().int().nonnegative(),
+  availableDays: z.number().int().nonnegative(),
+  preparedOn: z.string(),
+  eventDate: z.string(),
+});
+export type TimelineCompression = z.infer<typeof timelineCompressionSchema>;
+
 export const planOutputSchema = z.object({
   summary: z.string(),
   perPlate: z.number().int().nonnegative().optional(),
   budget: z.array(budgetCategorySchema),
   timeline: z.array(milestoneSchema),
+  timelineCompression: timelineCompressionSchema.optional(),
   vendors: z.array(vendorSchema),
   ideas: z.array(ideaSchema),
 });

@@ -112,6 +112,14 @@ describe('Budget Math - Deterministic Allocation', () => {
     expect(newTotal).toBe(80_000);
     const sum = updatedCategories.reduce((acc, c) => acc + c.amount, 0);
     expect(sum).toBe(80_000);
+    expect(calculateBudgetTotals(updatedCategories, newTotal).isOverBudget).toBe(false);
+    for (const percent of [10, 20, 30]) {
+      const cut = applyBudgetCut(categories, currentTotal, percent);
+      expect(calculateBudgetTotals(cut.updatedCategories, cut.newTotal).totalActual).toBe(
+        cut.newTotal,
+      );
+      expect(calculateBudgetTotals(cut.updatedCategories, cut.newTotal).isOverBudget).toBe(false);
+    }
   });
 
   it('allocates single item — full budget goes to it', () => {

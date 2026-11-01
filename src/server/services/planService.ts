@@ -1,10 +1,16 @@
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { type PlanOutput, type WizardInput, rawIdeaSchema } from '../../shared/schemas.js';
+import {
+  type PlanOutput,
+  type WizardInput,
+  getTodayInKolkata,
+  rawIdeaSchema,
+} from '../../shared/schemas.js';
 import { buildPlanPrompt, wrapUserText } from '../prompts/plan.js';
 import { callModel, type AiCallContext } from './model.js';
 import { generateFallbackPlan } from './fallback.js';
 import { createPlanCacheKey, getCachedPlan, setCachedPlan } from './cache.js';
+import { sharePlanGeneration, type PlanGenerationResult } from './sharedPlanGeneration.js';
 
 const creativePlanSchema = z.object({
   summary: z.string().min(1).max(3000),
@@ -26,20 +32,33 @@ const creativePlanSchema = z.object({
 export async function generateEventPlan(
   input: WizardInput,
   context: AiCallContext = {},
-): Promise<{
-  plan: PlanOutput;
-  source: 'gemini' | 'cache' | 'fallback';
-  model?: string;
-}> {
-  const cacheKey = createPlanCacheKey(input);
+): Promise<PlanGenerationResult> {
+  context.signal?.throwIfAborted();
+  const snapshot = structuredClone(input);
+  const planningToday = getTodayInKolkata();
+  const cacheKey = createPlanCacheKey({ ...snapshot, planningToday });
   const cached = getCachedPlan(cacheKey);
-  if (cached) return { plan: cached, source: 'cache' };
-  const preset = generateFallbackPlan(input);
+  if (cached) return { plan: structuredClone(cached), source: 'cache' };
+  return sharePlanGeneration(
+    cacheKey,
+    (sharedContext) => createEventPlan(snapshot, planningToday, cacheKey, sharedContext),
+    context,
+  );
+}
+
+async function createEventPlan(
+  input: WizardInput,
+  planningToday: string,
+  cacheKey: string,
+  context: AiCallContext,
+): Promise<PlanGenerationResult> {
+  const preset = generateFallbackPlan(input, planningToday);
   const result = await callModel({
     ...context,
     schema: creativePlanSchema,
     prompt: `${buildPlanPrompt(input)}\nUse only the creative response schema. Code already owns all prices, percentages, dates and offsets. Do not compute or alter them.\nDescribe these existing tasks by exact name: ${wrapUserText(JSON.stringify(preset.timeline.map((task) => task.title)))}\nProvide questions for these existing vendor categories by exact name: ${wrapUserText(JSON.stringify(preset.vendors.map((vendor) => vendor.category)))}`,
   });
+  context.signal?.throwIfAborted();
   if (!result) return { plan: preset, source: 'fallback' };
   const { data, model } = result;
   const plan: PlanOutput = {
@@ -59,6 +78,6 @@ export async function generateEventPlan(
         vendor.questionsToAsk,
     })),
   };
-  setCachedPlan(cacheKey, plan);
+  setCachedPlan(cacheKey, structuredClone(plan));
   return { plan, source: 'gemini', model };
 }

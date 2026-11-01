@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { planOutputSchema, wizardInputSchema } from '../../shared/schemas.js';
+import { planOutputSchema, storedWizardInputSchema } from '../../shared/schemas.js';
 import type { PlanOutput, WizardInput } from '../../shared/schemas.js';
 
 export interface StoredGuestPlan {
@@ -40,7 +40,7 @@ export function loadGuestPlan(): StoredGuestPlan | null {
     const result = z
       .object({
         planId: z.string().min(1),
-        input: wizardInputSchema,
+        input: storedWizardInputSchema,
         plan: planOutputSchema,
         updatedAt: z.string(),
       })

@@ -7,7 +7,7 @@ import {
   type Vendor,
   type Idea,
 } from '@shared/schemas';
-import { scaleGuests } from '@shared/budget';
+import { scaleGuests, scaleGuestCount, updateBudgetCategories } from '@shared/budget';
 import { acceptQuotation, matchVendorBudgetCategory, type VendorQuote } from '@shared/quotes';
 import { BudgetTab } from './BudgetTab';
 import { TimelineTab } from './TimelineTab';
@@ -32,7 +32,7 @@ export interface DashboardPanelProps {
 export function DashboardPanel({ tab, input, plan, readOnly, onUpdatePlan }: DashboardPanelProps) {
   const categories = useCallback(
     (budget: BudgetCategory[], newTotal?: number) => {
-      onUpdatePlan({ ...plan, budget }, newTotal);
+      onUpdatePlan(updateBudgetCategories(plan, budget, true), newTotal);
     },
     [plan, onUpdatePlan],
   );
@@ -42,11 +42,11 @@ export function DashboardPanel({ tab, input, plan, readOnly, onUpdatePlan }: Das
       ? Math.round(
           plan.budget
             .filter((category) => /cater|food|prasad/i.test(category.category))
-            .reduce((sum, category) => sum + category.amount, 0) / input.guestCount,
+            .reduce((sum, category) => sum + category.actual, 0) / input.guestCount,
         )
       : 0);
   const guests = (count: number) => {
-    onUpdatePlan(scaleGuests(plan, count, inferredRate).plan, undefined, count);
+    onUpdatePlan(scaleGuestCount(plan, input.guestCount, count).plan, undefined, count);
   };
   const perPlate = (rate: number) => {
     onUpdatePlan(scaleGuests(plan, input.guestCount, rate).plan);
@@ -68,14 +68,28 @@ export function DashboardPanel({ tab, input, plan, readOnly, onUpdatePlan }: Das
   const vendor = (id: string, updates: Partial<Vendor>) => {
     const current = plan.vendors.find((v) => v.id === id);
     const category = current ? matchVendorBudgetCategory(plan, current) : undefined;
+    const manualAmount = updates.quotedAmount;
+    const clearAcceptance =
+      manualAmount !== undefined || (updates.status !== undefined && updates.status !== 'booked');
     onUpdatePlan({
       ...plan,
-      vendors: plan.vendors.map((v) => (v.id === id ? { ...v, ...updates } : v)),
+      vendors: plan.vendors.map((v) =>
+        v.id === id
+          ? {
+              ...v,
+              ...updates,
+              ...(clearAcceptance ? { acceptedQuoteId: undefined } : {}),
+              ...(manualAmount === undefined
+                ? {}
+                : { status: manualAmount > 0 ? ('quoted' as const) : ('to-contact' as const) }),
+            }
+          : v,
+      ),
       budget:
-        updates.quotedAmount !== undefined && category
+        category && clearAcceptance
           ? plan.budget.map((c) =>
               c.id === category.id
-                ? { ...c, actual: updates.quotedAmount ?? c.actual, verified: false }
+                ? { ...c, actual: manualAmount ?? c.actual, verified: false }
                 : c,
             )
           : plan.budget,
@@ -109,6 +123,7 @@ export function DashboardPanel({ tab, input, plan, readOnly, onUpdatePlan }: Das
       {tab === 'timeline' && (
         <TimelineTab
           milestones={plan.timeline}
+          compression={plan.timelineCompression}
           eventDate={input.eventDate}
           onToggleMilestone={toggle}
           onUpdateMilestones={(timeline) => {

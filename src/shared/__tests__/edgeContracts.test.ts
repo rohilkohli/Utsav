@@ -68,14 +68,22 @@ it('resizes zero pools and immutable commitments without losing exact totals', (
     resizeBudget([{ ...category('paid'), verified: true }], 50).updatedCategories[0]?.actual,
   ).toBe(100);
 });
-it('preserves accepted catering quote rates when zero per-plate override is supplied', () => {
+it('treats a zero per-plate rate as a manual override without changing saved quotation terms', () => {
   const accepted = acceptQuotation(
     plan(),
     vendor.id,
     { ...quote, pricePerPlate: 5, guestMinimum: 20 },
     10,
   );
-  expect(scaleGuests(accepted, 10, 0).requiredCatering).toBe(100);
+  const result = scaleGuests(accepted, 10, 0);
+  expect(result.requiredCatering).toBe(0);
+  expect(result.plan.budget[0]?.verified).toBe(false);
+  expect(result.plan.vendors[0]).toMatchObject({
+    quotedAmount: 0,
+    acceptedQuoteId: undefined,
+    status: 'to-contact',
+  });
+  expect(result.plan.vendors[0]?.quotes).toEqual(accepted.vendors[0]?.quotes);
 });
 it('schedules default-duration dependencies and distinguishes explicit unquantified delay flags', () => {
   const parent = { ...task('parent', 20), durationDays: undefined };

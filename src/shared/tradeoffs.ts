@@ -1,13 +1,16 @@
 import { requireValue } from './invariants.js';
 import type { BudgetCategory } from './schemas.js';
-import { allocateAmountsByLargestRemainder } from './budget.js';
+import { allocateAmountsByLargestRemainder, nonnegativeInteger } from './allocation.js';
 
 export interface TradeoffOption {
   id: string;
   label: string;
   description: string;
-  /** Actual spend after the proposed reductions; declared budget is unchanged. */
+  /** The user's unchanged target budget. */
   newTotal: number;
+  newTotalActual: number;
+  feasible: boolean;
+  uncoveredShortfall: number;
   savings: number;
   updatedCategories: BudgetCategory[];
 }
@@ -21,22 +24,29 @@ function reducePool(
   categories: BudgetCategory[],
   savings: number,
   eligible: (category: BudgetCategory) => boolean,
+  maximumFraction = 1,
 ): BudgetCategory[] {
   const pool = categories.filter(
     (category) => !category.locked && !category.verified && eligible(category),
   );
-  const total = pool.reduce((sum, category) => sum + category.actual, 0);
-  const amounts = allocateAmountsByLargestRemainder(
-    pool.map((category) => ({ suggestedPercent: category.actual })),
-    Math.max(0, total - savings),
+  const capacities = pool.map((category) => Math.floor(category.actual * maximumFraction));
+  const total = capacities.reduce((sum, capacity) => sum + capacity, 0);
+  const retained = allocateAmountsByLargestRemainder(
+    capacities.map((capacity) => ({ suggestedPercent: capacity })),
+    Math.max(0, total - Math.max(0, savings)),
   );
-  const byId = new Map(pool.map((category, index) => [category.id, requireValue(amounts[index])]));
+  const byId = new Map(
+    pool.map((category, index) => [
+      category.id,
+      category.actual - requireValue(capacities[index]) + requireValue(retained[index]),
+    ]),
+  );
   return categories.map((category) =>
     byId.has(category.id) ? { ...category, actual: requireValue(byId.get(category.id)) } : category,
   );
 }
 
-/** Three concrete proposals grounded in exact spend; immutable commitments stay intact. */
+/** Show each strategy's real outcome, including gaps that cannot safely be covered. */
 export function suggestTradeoffs(
   categories: BudgetCategory[],
   totalBudget: number,
@@ -48,7 +58,7 @@ export function suggestTradeoffs(
     .filter((category) => !category.locked && !category.verified)
     .reduce((sum, category) => sum + category.actual, 0);
   if (available === 0) return [];
-  const target = Math.max(before - available, Math.floor(Math.max(0, totalBudget) * 0.98));
+  const target = nonnegativeInteger(totalBudget);
   const needed = before - target;
   const option = (
     id: string,
@@ -56,17 +66,28 @@ export function suggestTradeoffs(
     description: string,
     updatedCategories: BudgetCategory[],
   ): TradeoffOption => {
-    const newTotal = updatedCategories.reduce((sum, category) => sum + category.actual, 0);
-    return { id, label, description, newTotal, savings: before - newTotal, updatedCategories };
+    const newTotalActual = updatedCategories.reduce((sum, category) => sum + category.actual, 0);
+    const uncoveredShortfall = Math.max(0, newTotalActual - target);
+    return {
+      id,
+      label,
+      description,
+      newTotal: target,
+      newTotalActual,
+      feasible: uncoveredShortfall === 0,
+      uncoveredShortfall,
+      savings: before - newTotalActual,
+      updatedCategories,
+    };
   };
   const uniform = reducePool(categories, needed, () => true);
-  const flex = reducePool(categories, needed, (category) => flexible.test(category.category));
-  const flexRemaining = flex.reduce((sum, category) => sum + category.actual, 0) - target;
+  const flex = reducePool(
+    categories,
+    needed,
+    (category) => flexible.test(category.category) && !essential.test(category.category),
+    0.4,
+  );
   const flexHasPool = categories.some((category) => flexible.test(category.category));
-  const flexFinished =
-    flexRemaining > 0
-      ? reducePool(flex, flexRemaining, (category) => !flexible.test(category.category))
-      : flex;
   const overspent = categories.some(
     (category) => category.actual > category.amount && !essential.test(category.category),
   );
@@ -89,8 +110,8 @@ export function suggestTradeoffs(
     option(
       flexHasPool ? 'flex-cut' : 'ten-pct-cut',
       'Trim décor & entertainment first',
-      'Reduce discretionary items first, then other uncommitted costs only if needed to meet the budget.',
-      flexFinished,
+      'Reduce discretionary costs by at most 40%, preserving essentials, locks and accepted quotations.',
+      flex,
     ),
     option(
       overspent && underspent ? 'rebalance' : 'smart-cut',

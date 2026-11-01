@@ -32,7 +32,10 @@ export const BudgetTab = ({
   const cateringBudget = categories
     .filter((c) => /cater|food|prasad/i.test(c.category))
     .reduce((sum, c) => sum + c.amount, 0);
-  const shortfall = Math.max(0, guestCount * perPlate - cateringBudget);
+  const requiredCatering = categories
+    .filter((c) => /cater|food|prasad/i.test(c.category))
+    .reduce((sum, c) => sum + c.actual, 0);
+  const shortfall = Math.max(0, requiredCatering - cateringBudget);
   const update = (id: string, fields: Partial<BudgetCategory>) => {
     onUpdateCategories(categories.map((c) => (c.id === id ? { ...c, ...fields } : c)));
   };
@@ -135,8 +138,7 @@ export const BudgetTab = ({
         aria-live="polite"
         className={`dashboard-card dashboard-sticky ${shortfall > 0 ? 'dashboard-warning' : ''}`}
       >
-        Catering required: {formatINR(guestCount * perPlate)} · Allocated:{' '}
-        {formatINR(cateringBudget)}
+        Catering required: {formatINR(requiredCatering)} · Allocated: {formatINR(cateringBudget)}
         {shortfall > 0 && <strong> · Catering shortfall: {formatINR(shortfall)}</strong>}
       </div>
       <div className="dashboard-card dashboard-row dashboard-between">

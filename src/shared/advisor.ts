@@ -1,6 +1,7 @@
 import type { PlanOutput, WizardInput } from './schemas.js';
 import { formatINR } from './currency.js';
-import { buildSchedule, diffInDays } from './timeline.js';
+import { diffInDays } from './timeline.js';
+import { planSchedule } from './timelinePreparation.js';
 
 export interface PlanFacts {
   budget: { total: number; actual: number; remaining: number };
@@ -16,7 +17,7 @@ export function planFacts(plan: PlanOutput, input: WizardInput, today: string): 
   const actual = plan.budget.reduce((sum, category) => sum + category.actual, 0);
   let next: { title: string; effectiveDate: string } | undefined;
   try {
-    next = buildSchedule(plan.timeline, input.eventDate, today)
+    next = planSchedule(plan, input.eventDate, today)
       .filter((task) => !task.completed && task.status !== 'done' && task.effectiveDate >= today)
       .sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate))[0];
   } catch {
@@ -30,7 +31,9 @@ export function planFacts(plan: PlanOutput, input: WizardInput, today: string): 
     nextTask: next?.title,
     nextTaskDate: next?.effectiveDate,
     unbookedVendors: plan.vendors.filter((vendor) => vendor.status !== 'booked').length,
-    requiredCatering: input.guestCount * (plan.perPlate ?? 0),
+    requiredCatering: plan.budget
+      .filter((category) => /cater|food|prasad/i.test(category.category))
+      .reduce((sum, category) => sum + category.actual, 0),
   };
 }
 
@@ -72,8 +75,8 @@ export function localAnswer(
         : 'The event date has passed.';
   if (/(guest|mehm[aā]n|mehmaan|अतिथि|मेहमान)/.test(text))
     return hindi
-      ? `योजना ${facts.guests} मेहमानों के लिए है। प्रति प्लेट दर के अनुसार भोजन का खर्च ${formatINR(facts.requiredCatering)} है।`
-      : `The plan is sized for ${facts.guests} guests. At the current per-plate rate catering requires ${formatINR(facts.requiredCatering)}.`;
+      ? `योजना ${facts.guests} मेहमानों के लिए है। वर्तमान भोजन अनुमान और स्वीकृत कोटेशन का खर्च ${formatINR(facts.requiredCatering)} है।`
+      : `The plan is sized for ${facts.guests} guests. Current catering estimates and accepted quotations total ${formatINR(facts.requiredCatering)}.`;
   return hindi
     ? 'मैं वर्तमान योजना के बजट, विक्रेताओं, अगले काम, समय और मेहमानों में मदद कर सकता हूँ।'
     : 'I can help with your budget, vendors, next task, timing, or guest count using the live plan.';

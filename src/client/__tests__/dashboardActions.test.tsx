@@ -29,10 +29,13 @@ it('explains exact tradeoff facts and applies the selected reduction', async () 
   expect(await screen.findByText('Reduce discretionary spending by ₹100.')).toBeVisible();
   expect(apiExplainTradeoffs).toHaveBeenCalledWith(
     100,
-    expect.arrayContaining([expect.objectContaining({ savings: expect.any(Number) as unknown })]),
+    expect.arrayContaining([expect.objectContaining({ savings: 100, newTotal: 100 })]),
     expect.anything(),
   );
-  await user.click(screen.getByRole('button', { name: /Trim décor/ }));
+  expect(
+    screen.getByRole('button', { name: /Trim décor.*Uncovered shortfall: ₹20/ }),
+  ).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: /Scale adjustable/ }));
   expect(update).toHaveBeenCalledOnce();
 });
 it('recovers from Places clipboard refusal and lets a family link a verified business', async () => {

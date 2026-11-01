@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PlanOutput, WizardInput } from '@shared/schemas';
 import { getTodayInKolkata } from '@shared/schemas';
 import { planInsights, type InsightTab } from '@shared/insights';
@@ -15,6 +15,7 @@ interface AssistantPanelProps {
 
 export function AssistantPanel({ plan, input, onNavigate }: AssistantPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const reviewButton = useRef<HTMLButtonElement>(null);
   const call = useAiCall<Awaited<ReturnType<typeof apiReviewPlan>>>();
   const { reset } = call;
   const today = getTodayInKolkata();
@@ -67,6 +68,7 @@ export function AssistantPanel({ plan, input, onNavigate }: AssistantPanelProps)
       )}
       <AskPlanner plan={plan} input={input} />
       <button
+        ref={reviewButton}
         type="button"
         className="assistant-review-button"
         onClick={() => {
@@ -93,6 +95,16 @@ export function AssistantPanel({ plan, input, onNavigate }: AssistantPanelProps)
             Plan review · {call.result.review.overallScore}/10 · Assistant (
             {call.result.source === 'gemini' ? 'Gemini' : 'Built-in Planner'})
           </summary>
+          <button
+            type="button"
+            className="assistant-review-button"
+            onClick={() => {
+              reset();
+              reviewButton.current?.focus();
+            }}
+          >
+            Dismiss plan review
+          </button>
           {(['strengths', 'risks', 'suggestions'] as const).map((section) => (
             <div key={section}>
               <h3>

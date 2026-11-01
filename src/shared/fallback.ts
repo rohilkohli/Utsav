@@ -4,7 +4,8 @@
  * default data for each supported Indian event type — no LLM call required.
  * Also used by instant local planning without network access.
  */
-import type { WizardInput, PlanOutput } from './schemas.js';
+import { getTodayInKolkata, type WizardInput, type PlanOutput } from './schemas.js';
+import { prepareTimeline } from './timelinePreparation.js';
 import { createFallbackIdeas } from './fallbackIdeas.js';
 import { createFallbackBudget } from './fallbackBudget.js';
 import { computeMilestoneDate } from './timeline.js';
@@ -17,7 +18,7 @@ import { computeMilestoneDate } from './timeline.js';
  * @param input - Validated wizard input (event type, city, budget, guest count, date)
  * @returns A fully enriched PlanOutput with budget, timeline, vendors, and ideas
  */
-export function generateFallbackPlan(input: WizardInput): PlanOutput {
+export function generateFallbackPlan(input: WizardInput, today = getTodayInKolkata()): PlanOutput {
   let sequence = 0;
   const nextId = () => `preset-${input.eventType}-${++sequence}`;
   const isWedding = input.eventType === 'wedding';
@@ -191,7 +192,7 @@ export function generateFallbackPlan(input: WizardInput): PlanOutput {
   return {
     summary: `A vibrant ${input.eventType} celebration designed for ${input.guestCount} guests in ${input.city}, bringing memorable cultural hospitality within your ₹${input.totalBudget.toLocaleString('en-IN')} budget.`,
     budget: enrichedBudget,
-    timeline: normalizedMilestones,
+    ...prepareTimeline({ timeline: normalizedMilestones }, input.eventDate, today),
     vendors: defaultVendors,
     ideas: defaultIdeas,
   };

@@ -1,4 +1,5 @@
-import type { PlanOutput, WizardInput } from '@shared/schemas';
+import { getTodayInKolkata, type PlanOutput, type WizardInput } from '@shared/schemas';
+import { usePlanSchedule } from './usePlanSchedule';
 import { formatINR } from '@shared/currency';
 import { lazy, Suspense } from 'react';
 const RunSheetTab = lazy(() =>
@@ -9,11 +10,14 @@ export function ReadOnlyPanel({
   tab,
   plan,
   input,
+  today = getTodayInKolkata(),
 }: {
   tab: TabType;
   plan: PlanOutput;
   input: WizardInput;
+  today?: string;
 }) {
+  const schedule = usePlanSchedule(plan, input.eventDate, today);
   return (
     <div className="dashboard-stack">
       {tab === 'budget' && (
@@ -34,11 +38,24 @@ export function ReadOnlyPanel({
       {tab === 'timeline' && (
         <section className="dashboard-card">
           <h2>Timeline & Milestones</h2>
+          {schedule.error && <p role="alert">{schedule.error}</p>}
+          {plan.timelineCompression?.compressed && (
+            <p>
+              Schedule compressed to {plan.timelineCompression.availableDays} days of available
+              planning time.
+            </p>
+          )}
           <ol>
-            {plan.timeline.map((milestone) => (
+            {schedule.tasks.map((milestone) => (
               <li key={milestone.id}>
-                {milestone.date}: {milestone.title} · {milestone.completed ? 'Done' : 'To do'}
+                {milestone.effectiveDate}: {milestone.title} ·{' '}
+                {milestone.completed || milestone.status === 'done' ? 'Done' : 'To do'}
                 {milestone.assignee && ` · ${milestone.assignee}`}
+                {milestone.pushedBy.map((title) => (
+                  <p key={title}>Pushed by delayed task: {title}</p>
+                ))}
+                {milestone.flags.impossible && <p>Cannot finish before the celebration date</p>}
+                {milestone.flags.overdue && <p>Overdue</p>}
               </li>
             ))}
           </ol>

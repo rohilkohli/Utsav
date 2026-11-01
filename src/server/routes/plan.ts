@@ -5,7 +5,7 @@ import {
   generatePlanRequestSchema,
   savedPlanSchema,
   updatePlanRequestSchema,
-  wizardInputSchema,
+  storedWizardInputSchema,
   planOutputSchema,
 } from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
@@ -20,7 +20,7 @@ const router = Router();
 
 const savePlanRequestSchema = z
   .object({
-    input: wizardInputSchema,
+    input: storedWizardInputSchema,
     plan: planOutputSchema,
   })
   .strict();

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { secretResponseLeakLines } from './secretResponseGuard.js';
 
 const ROOT = join(import.meta.dirname, '../../..');
 function collect(dir: string): string[] {
@@ -68,6 +69,15 @@ describe('Repository hygiene', () => {
         (text) => /\bstyle\s*=\s*\{|<style\b/.test(text),
       ),
     ).toEqual([]);
+  });
+  it('never serializes Gemini or Maps server credentials from HTTP routes', () => {
+    const routeFiles = production.filter((file) => file.includes('/server/routes/'));
+    const leaks = routeFiles.flatMap((file) =>
+      secretResponseLeakLines(readFileSync(file, 'utf8')).map(
+        (line) => `${relative(ROOT, file)}:${line}`,
+      ),
+    );
+    expect(leaks).toEqual([]);
   });
   it('has no hardcoded credentials or unfinished production comments', () => {
     expect(

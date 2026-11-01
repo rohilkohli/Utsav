@@ -1,15 +1,21 @@
 import { nanoid } from 'nanoid';
 import {
   geminiRawPlanSchema,
+  getTodayInKolkata,
   type GeminiRawPlan,
   type PlanOutput,
   type WizardInput,
 } from '../../shared/schemas.js';
 import { ensureContingencyCategory, populateCategoryAmounts } from '../../shared/budget.js';
-import { computeMilestoneDate, topoOrder } from '../../shared/timeline.js';
+import { computeMilestoneDate } from '../../shared/timeline.js';
+import { prepareTimeline } from '../../shared/timelinePreparation.js';
 
 /** Enriches trusted structured presets using deterministic money and date engines. */
-export function enrichRawPlan(rawInput: GeminiRawPlan, input: WizardInput): PlanOutput {
+export function enrichRawPlan(
+  rawInput: GeminiRawPlan,
+  input: WizardInput,
+  today = getTodayInKolkata(),
+): PlanOutput {
   const raw = geminiRawPlanSchema.parse(rawInput);
   const budget = populateCategoryAmounts(
     ensureContingencyCategory(
@@ -36,7 +42,6 @@ export function enrichRawPlan(rawInput: GeminiRawPlan, input: WizardInput): Plan
       (reference) => idsByTitle.get(reference) ?? timeline[Number(reference)]?.id ?? reference,
     );
   }
-  topoOrder(timeline);
   const vendors = raw.vendors.map((vendor) => {
     const category = budget.find(
       (entry) =>
@@ -55,7 +60,7 @@ export function enrichRawPlan(rawInput: GeminiRawPlan, input: WizardInput): Plan
   return {
     summary: raw.summary,
     budget,
-    timeline,
+    ...prepareTimeline({ timeline }, input.eventDate, today),
     vendors,
     ideas: raw.ideas.map((idea) => ({ ...idea, id: nanoid() })),
   };

@@ -1,6 +1,7 @@
 import { allocateAmountsByLargestRemainder, nonnegativeInteger } from './allocation.js';
 export { allocateAmountsByLargestRemainder } from './allocation.js';
-export { scaleGuests, type GuestScaleResult } from './budgetGuests.js';
+export { scaleGuests, scaleGuestCount, type GuestScaleResult } from './budgetGuests.js';
+export { updateBudgetCategories } from './budgetSync.js';
 import type { BudgetCategory } from './schemas.js';
 import { requireValue } from './invariants.js';
 export { BUDGET_PRESETS, type BudgetPreset } from './budgetPresets.js';
@@ -135,6 +136,19 @@ export interface BudgetTotals {
   isOverBudget: boolean;
   overBudgetAmount: number;
   underBudgetAmount: number;
+}
+/** Reconcile the supplied target, then hold the edited category while peers absorb its delta. */
+export function redistributeCategoryAmount(
+  categories: BudgetCategory[],
+  categoryId: string,
+  newAmount: number,
+  totalBudget: number,
+): BudgetCategory[] {
+  return redistribute(
+    resizeBudget(categories, totalBudget).updatedCategories,
+    categoryId,
+    newAmount,
+  ).categories;
 }
 export function calculateBudgetTotals(
   categories: BudgetCategory[],

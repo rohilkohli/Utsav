@@ -113,7 +113,12 @@ const VendorCard = memo(function VendorCard({
             value={formatINR(vendor.quotedAmount)}
             onChange={(e) => {
               const amount = parseINR(e.target.value);
-              if (amount !== null) onUpdate({ quotedAmount: amount, acceptedQuoteId: undefined });
+              if (amount !== null)
+                onUpdate({
+                  quotedAmount: amount,
+                  acceptedQuoteId: undefined,
+                  status: amount > 0 ? 'quoted' : 'to-contact',
+                });
             }}
           />
         </label>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { wizardInputSchema, IDEA_SECTIONS } from './input.js';
+import { wizardInputSchema, storedWizardInputSchema, IDEA_SECTIONS } from './input.js';
 import { planOutputSchema, ideaSchema, type PlanOutput } from './plan.js';
 
 // ─── Plan Meta Source ─────────────────────────────────────────
@@ -18,7 +18,7 @@ export const refineInputSchema = z.object({
     .min(1, 'Instruction cannot be empty')
     .max(300, 'Instruction must be 300 characters or fewer'),
   currentPlan: planOutputSchema,
-  input: wizardInputSchema,
+  input: storedWizardInputSchema,
 });
 export type RefineInput = Omit<z.infer<typeof refineInputSchema>, 'currentPlan'> & {
   currentPlan: PlanOutput;
@@ -30,7 +30,7 @@ export const savedPlanSchema = z.object({
   ownerUid: z.string().optional(),
   userId: z.string().optional(),
   shareToken: z.string().optional(),
-  input: wizardInputSchema,
+  input: storedWizardInputSchema,
   plan: planOutputSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -40,7 +40,7 @@ export type SavedPlan = Omit<z.infer<typeof savedPlanSchema>, 'plan'> & { plan: 
 
 export const updatePlanRequestSchema = z
   .object({
-    input: wizardInputSchema.optional(),
+    input: storedWizardInputSchema.optional(),
     plan: planOutputSchema,
   })
   .strict();
@@ -70,9 +70,9 @@ export const refineSectionResponseSchema = z.object({
 export type RefineSectionResponse = z.infer<typeof refineSectionResponseSchema>;
 
 export const planReviewSchema = z.object({
-  strengths: z.array(z.string().min(1)).min(1),
-  risks: z.array(z.string().min(1)).min(1),
-  suggestions: z.array(z.string().min(1)).min(1),
+  strengths: z.array(z.string().min(1)).min(1).max(6),
+  risks: z.array(z.string().min(1)).min(1).max(6),
+  suggestions: z.array(z.string().min(1)).min(1).max(6),
   overallScore: z.number().int().min(1).max(10),
 });
 export type PlanReview = z.infer<typeof planReviewSchema>;
@@ -85,7 +85,7 @@ export const planReviewResponseSchema = z.object({
 export const askPlannerRequestSchema = z.object({
   question: z.string().trim().min(1).max(500),
   plan: planOutputSchema,
-  input: wizardInputSchema,
+  input: storedWizardInputSchema,
 });
 export type AskPlannerRequest = Omit<z.infer<typeof askPlannerRequestSchema>, 'plan'> & {
   plan: PlanOutput;

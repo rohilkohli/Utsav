@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { PlanOutput } from '@shared/schemas';
-import { calculateBudgetTotals } from '@shared/budget';
+import { calculateBudgetTotals, updateBudgetCategories } from '@shared/budget';
 import { suggestTradeoffs } from '@shared/tradeoffs';
 import { apiExplainTradeoffs } from '../../lib/api';
 import { useAiCall } from '../../hooks/useAiCall';
@@ -26,6 +26,7 @@ export function TradeoffSuggestions({
         : [],
     [plan.budget, totalBudget, totals],
   );
+  const feasibleOptions = options.filter((option) => option.feasible);
   if (!options.length) return null;
   return (
     <section
@@ -41,26 +42,31 @@ export function TradeoffSuggestions({
             key={option.id}
             className="dashboard-button"
             title={option.description}
+            disabled={!option.feasible}
             onClick={() => {
-              onUpdate({ ...plan, budget: option.updatedCategories });
+              onUpdate(updateBudgetCategories(plan, option.updatedCategories));
             }}
           >
             {option.label} (saves ₹{option.savings.toLocaleString('en-IN')})
+            {!option.feasible && (
+              <> · Uncovered shortfall: ₹{option.uncoveredShortfall.toLocaleString('en-IN')}</>
+            )}
           </button>
         ))}
       </div>
       <button
         type="button"
         className="dashboard-button"
+        disabled={!feasibleOptions.length}
         onClick={() => {
           void explain.run((progress) =>
             apiExplainTradeoffs(
               totals.overBudgetAmount,
-              options.map((option) => ({
+              feasibleOptions.map((option) => ({
                 label: option.label,
                 description: option.description,
                 savings: option.savings,
-                newTotal: option.newTotal,
+                newTotal: option.newTotalActual,
               })),
               progress,
             ),

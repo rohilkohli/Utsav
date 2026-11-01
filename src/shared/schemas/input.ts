@@ -40,16 +40,23 @@ export function isDateOnOrAfterTodayInKolkata(dateStr: string): boolean {
   return dateStr >= today;
 }
 
-// ─── Wizard Input Schema ──────────────────────────────────────
-export const wizardInputSchema = z
+/** Validate a calendar date without applying the new-event "not in the past" rule. */
+export function isValidCalendarDate(dateStr: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === dateStr;
+}
+
+// Persisted plans remain valid after their celebration date. Only creation adds a clock rule.
+export const storedWizardInputSchema = z
   .object({
     eventType: z.enum(EVENT_TYPES),
     subEvents: z.array(z.string().min(1).max(100)).default([]),
     eventDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-      .refine(isDateOnOrAfterTodayInKolkata, {
-        message: 'Event date cannot be in the past (IST)',
+      .refine(isValidCalendarDate, {
+        message: 'Event date must be a valid calendar date',
       }),
     city: z.string().trim().min(1, 'City is required').max(100),
     guestCount: z
@@ -79,5 +86,13 @@ export const wizardInputSchema = z
       path: ['subEvents'],
     },
   );
+
+export const wizardInputSchema = storedWizardInputSchema.refine(
+  (data) => isDateOnOrAfterTodayInKolkata(data.eventDate),
+  {
+    message: 'Event date cannot be in the past (IST)',
+    path: ['eventDate'],
+  },
+);
 
 export type WizardInput = z.infer<typeof wizardInputSchema>;

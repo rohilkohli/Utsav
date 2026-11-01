@@ -13,75 +13,102 @@ export const QuoteComparison = ({
   onAccept,
   onRemove,
 }: QuoteComparisonProps) => {
-  const quotes = vendor.quotes?.length
-    ? vendor.quotes
-    : vendor.quotedAmount > 0
-      ? [
-          {
-            id: vendor.id,
-            vendorId: vendor.id,
-            vendorName: vendor.category,
-            category: vendor.category,
-            quotedAmount: vendor.quotedAmount,
-            budgetedAmount: vendor.budgetedAmount,
-            notes: '',
-            receivedAt: '',
-          },
-        ]
-      : [];
+  const saved = vendor.quotes ?? [];
+  const manual: VendorQuote | null =
+    vendor.quotedAmount > 0 && !vendor.acceptedQuoteId
+      ? {
+          id: vendor.id,
+          vendorId: vendor.id,
+          vendorName: vendor.businessName ?? vendor.category,
+          category: vendor.category,
+          quotedAmount: vendor.quotedAmount,
+          budgetedAmount: vendor.budgetedAmount,
+          notes: '',
+          receivedAt: '',
+        }
+      : null;
+  const quotes = saved.length ? saved : manual ? [manual] : [];
   if (!quotes.length) return null;
   return (
     <section aria-label={`Quote comparison for ${vendor.category}`}>
       <h4>Compare quotations</h4>
+      {manual && saved.length > 0 && (
+        <div
+          className="dashboard-card"
+          role="status"
+          aria-label={`Current manual quote for ${vendor.category}`}
+        >
+          <h5>Current manual quotation</h5>
+          <QuoteSummary
+            quote={manual}
+            budgetedAmount={vendor.budgetedAmount}
+            guestCount={guestCount}
+          />
+          <p>Saved quotations below are unchanged. Accept one to restore its agreed terms.</p>
+        </div>
+      )}
       <div className="dashboard-quote-grid">
-        {quotes.map((quote) => {
-          const amount = effectiveCost(quote, guestCount);
-          const comparison = compareQuote({
-            ...quote,
-            quotedAmount: amount,
-            budgetedAmount: vendor.budgetedAmount,
-          });
-          return (
-            <article key={quote.id} className="dashboard-card">
-              <h5>{quote.vendorName}</h5>
-              <p>
-                <strong>{formatINR(amount)}</strong>
-              </p>
-              <p className="dashboard-badge">
-                {comparison.verdict.replaceAll('-', ' ')} · {comparison.deltaPercent}% vs target
-              </p>
-              <p>{comparison.recommendation}</p>
-              <p>Risk flags: {riskFlags(quote, guestCount).join(', ') || 'None'}</p>
-              {vendor.acceptedQuoteId === quote.id ? (
-                <p className="dashboard-success">Accepted quotation</p>
-              ) : (
-                onAccept && (
-                  <button
-                    type="button"
-                    className="dashboard-button dashboard-button--primary"
-                    onClick={() => {
-                      onAccept(quote);
-                    }}
-                  >
-                    Accept quotation from {quote.vendorName}
-                  </button>
-                )
-              )}
-              {onRemove && vendor.acceptedQuoteId !== quote.id && (
+        {quotes.map((quote) => (
+          <article key={quote.id} className="dashboard-card">
+            <h5>{quote.vendorName}</h5>
+            <QuoteSummary
+              quote={quote}
+              budgetedAmount={vendor.budgetedAmount}
+              guestCount={guestCount}
+            />
+            {vendor.acceptedQuoteId === quote.id ? (
+              <p className="dashboard-success">Accepted quotation</p>
+            ) : (
+              onAccept && (
                 <button
                   type="button"
-                  className="dashboard-button"
+                  className="dashboard-button dashboard-button--primary"
                   onClick={() => {
-                    onRemove(quote.id);
+                    onAccept(quote);
                   }}
                 >
-                  Remove quotation from {quote.vendorName}
+                  Accept quotation from {quote.vendorName}
                 </button>
-              )}
-            </article>
-          );
-        })}
+              )
+            )}
+            {onRemove && vendor.acceptedQuoteId !== quote.id && (
+              <button
+                type="button"
+                className="dashboard-button"
+                onClick={() => {
+                  onRemove(quote.id);
+                }}
+              >
+                Remove quotation from {quote.vendorName}
+              </button>
+            )}
+          </article>
+        ))}
       </div>
     </section>
   );
 };
+function QuoteSummary({
+  quote,
+  budgetedAmount,
+  guestCount,
+}: {
+  quote: VendorQuote;
+  budgetedAmount: number;
+  guestCount: number;
+}) {
+  const amount = effectiveCost(quote, guestCount);
+  const comparison = compareQuote({ ...quote, quotedAmount: amount, budgetedAmount });
+  return (
+    <>
+      <p>
+        <strong>{formatINR(amount)}</strong>
+      </p>
+      <p className="dashboard-badge">
+        {comparison.verdict.replaceAll('-', ' ')} · {comparison.deltaPercent}% vs target
+      </p>
+      <p>{comparison.recommendation}</p>
+      <p>Risk flags: {riskFlags({ ...quote, budgetedAmount }, guestCount).join(', ') || 'None'}</p>
+    </>
+  );
+}

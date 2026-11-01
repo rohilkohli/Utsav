@@ -1,6 +1,10 @@
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { wizardInputSchema, planOutputSchema, savedPlanSchema } from '../../shared/schemas.js';
+import {
+  storedWizardInputSchema,
+  planOutputSchema,
+  savedPlanSchema,
+} from '../../shared/schemas.js';
 import { validateBody } from '../middleware/validate.js';
 import { writeLimiter, readLimiter } from '../middleware/rateLimit.js';
 import { optionalAuth } from '../middleware/auth.js';
@@ -10,7 +14,7 @@ import { logger } from '../lib/logger.js';
 const router = Router();
 
 const shareRequestSchema = z.object({
-  input: wizardInputSchema,
+  input: storedWizardInputSchema,
   plan: planOutputSchema,
 });
 

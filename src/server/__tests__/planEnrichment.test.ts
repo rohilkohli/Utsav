@@ -47,6 +47,19 @@ describe('Plan enrichment references and deterministic allocations', () => {
     expect(plan.vendors[0]?.budgetedAmount).toBeGreaterThan(0);
     expect(plan.vendors[1]?.budgetedAmount).toBe(0);
   });
+  it('prepares and persists a short-notice schedule using the supplied planning day', () => {
+    const generated = enrichRawPlan(fixture(), { ...input, eventDate: '2030-01-03' }, '2030-01-01');
+    expect(generated.timelineCompression).toEqual({
+      compressed: true,
+      originalSpanDays: 10,
+      availableDays: 2,
+      preparedOn: '2030-01-01',
+      eventDate: '2030-01-03',
+    });
+    expect(
+      generated.timeline.every((task) => task.date >= '2030-01-01' && task.date <= '2030-01-03'),
+    ).toBe(true);
+  });
   it('rejects unresolved dependencies and cycles instead of returning a corrupt schedule', () => {
     const raw = fixture();
     raw.timeline[1] = {

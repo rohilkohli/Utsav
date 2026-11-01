@@ -1,6 +1,7 @@
 import type { PlanOutput, WizardInput } from './schemas.js';
 import { formatINR } from './currency.js';
-import { buildSchedule, diffInDays } from './timeline.js';
+import { diffInDays } from './timeline.js';
+import { planSchedule } from './timelinePreparation.js';
 import { riskFlags } from './quotes.js';
 
 export type InsightSeverity = 'critical' | 'warning' | 'suggestion';
@@ -30,7 +31,7 @@ export function planInsights(plan: PlanOutput, input: WizardInput, today: string
     });
   }
   try {
-    const schedule = buildSchedule(plan.timeline, input.eventDate, today);
+    const schedule = planSchedule(plan, input.eventDate, today);
     if (schedule.some((task) => task.flags.impossible || task.flags.tooLate)) {
       insights.push({
         id: 'timeline-impossible',
