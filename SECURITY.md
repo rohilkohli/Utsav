@@ -3,7 +3,7 @@
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
+| ------- | --------- |
 | latest  | ✅        |
 
 ## Reporting a Vulnerability
@@ -20,10 +20,10 @@ You will receive a response within **48 hours** acknowledging the report. We wil
 
 ## Security Measures in This Project
 
-- **Content Security Policy** — strict `connectSrc` and `scriptSrc` directives, no external scripts loaded at runtime.
-- **Rate limiting** — all API endpoints are rate-limited per IP to prevent abuse.
+- **Content Security Policy** — strict script, style, connection, and framing directives with specific allowed services.
+- **Rate limiting** — generation, sharing, vendor-search, and voice entry points have rate limits.
 - **Authentication** — Firebase Auth (Google Sign-In) for user identity; server validates every Firebase ID token before accessing user data.
-- **API keys** — never embedded in client bundles; GEMINI_API_KEY and GOOGLE_MAPS_API_KEY are stored in Google Cloud Secret Manager and injected at runtime.
-- **No SQL / injection surface** — Firestore uses typed SDK calls, no raw query concatenation.
+- **API keys** — Gemini and Places credentials stay server-side. Use Secret Manager for production secrets; Firebase web configuration is intentionally public.
+- **Input validation** — Zod schemas and payload caps guard API inputs and structured model output; prompt boundaries treat user text as untrusted. Firestore access uses the Admin SDK.
 - **CORS** — not enabled; server only serves its own SPA and API.
 - **Dependency hygiene** — `npm audit` is run in CI on every push.
