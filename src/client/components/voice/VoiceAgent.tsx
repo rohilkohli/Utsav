@@ -1,8 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import type { PlanOutput, WizardInput } from '@shared/schemas';
 import { float32ToPcm16Base64, pcm16Base64ToFloat32 } from '../../lib/audioPcm';
-import { VoiceTranscript } from './VoiceTranscript';
 import type { VoiceTranscriptMessage } from './VoiceTranscript';
+import { VoicePanel } from './VoicePanel';
 
 type AgentStatus = 'idle' | 'connecting' | 'ready' | 'listening' | 'speaking' | 'ended';
 type TabName = 'budget' | 'timeline' | 'vendors' | 'ideas';
@@ -12,24 +12,6 @@ export interface VoiceAgentProps {
   input?: WizardInput | null;
   onNavigateTab?: (tab: TabName) => void;
 }
-
-const STATUS_LABEL: Record<AgentStatus, string> = {
-  idle: 'Tap to Talk',
-  connecting: 'Connecting…',
-  ready: 'Ready',
-  listening: 'Listening…',
-  speaking: 'Utsav Speaking…',
-  ended: 'Call Ended',
-};
-
-const STATUS_COLOR: Record<AgentStatus, string> = {
-  idle: '#6b7280',
-  connecting: '#f59e0b',
-  ready: '#10b981',
-  listening: '#ef4444',
-  speaking: '#3b82f6',
-  ended: '#6b7280',
-};
 
 // ─── component ────────────────────────────────────────────────────────────────
 
@@ -477,201 +459,17 @@ Guidelines:
 
   const canConnect = status === 'idle' || status === 'ended';
 
-  // ── ring scale based on mic vol ──
-  const ringScale = 1 + micVol * 0.45;
-  const btnScale = 1 + micVol * 0.08;
-
   return (
-    <>
-      <style>{`
-        @keyframes uv-pulse {
-          0%,100% { opacity:.35; transform:scale(1); }
-          50% { opacity:.7; transform:scale(1.15); }
-        }
-        @keyframes uv-spin {
-          from { transform:rotate(0deg); }
-          to { transform:rotate(360deg); }
-        }
-        .uv-ring {
-          position:absolute; inset:-10px; border-radius:50%;
-          border:2px solid rgba(255,111,0,.55);
-          transition:transform .05s linear;
-          pointer-events:none;
-        }
-        .uv-ring.idle { animation:uv-pulse 2.5s ease-in-out infinite; }
-        .uv-ring.connecting { animation:uv-spin 1s linear infinite; border-style:dashed; }
-      `}</style>
-
-      {/* Floating button */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '1.75rem',
-          right: '1.75rem',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          gap: '0.75rem',
-        }}
-      >
-        {/* Voice panel */}
-        {isOpen && (
-          <div
-            style={{
-              width: '340px',
-              maxHeight: '480px',
-              background: 'var(--surface-card)',
-              border: '1px solid var(--surface-border)',
-              borderRadius: 'var(--radius-lg)',
-              boxShadow: '0 8px 40px rgba(0,0,0,.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '0.85rem 1rem',
-                background:
-                  'linear-gradient(135deg,var(--primary-saffron) 0%,var(--primary-magenta) 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-              }}
-            >
-              <span style={{ fontSize: '1.15rem' }}>🎙️</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fff' }}>
-                  Utsav Voice
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'rgba(255,255,255,.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: STATUS_COLOR[status],
-                      boxShadow: `0 0 6px ${STATUS_COLOR[status]}`,
-                    }}
-                  />
-                  {STATUS_LABEL[status]}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleToggle}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  lineHeight: 1,
-                  padding: '0.2rem',
-                }}
-                aria-label="Close voice agent"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Transcript */}
-            <VoiceTranscript messages={messages} transcriptRef={transcriptRef} />
-
-            {/* Controls */}
-            <div
-              style={{
-                padding: '0.75rem 1rem',
-                borderTop: '1px solid var(--surface-border)',
-                display: 'flex',
-                gap: '0.5rem',
-              }}
-            >
-              {canConnect ? (
-                <button
-                  type="button"
-                  onClick={connect}
-                  style={{
-                    flex: 1,
-                    padding: '0.6rem',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background:
-                      'linear-gradient(135deg,var(--primary-saffron),var(--primary-magenta))',
-                    color: '#fff',
-                    boxShadow: '0 2px 8px rgba(230,81,0,.3)',
-                  }}
-                >
-                  🎙️ Connect &amp; Talk
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={disconnect}
-                  style={{
-                    flex: 1,
-                    padding: '0.6rem',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--surface-border)',
-                    cursor: 'pointer',
-                    background: 'var(--surface-card-hover)',
-                    color: 'var(--text-main)',
-                  }}
-                >
-                  ⏹ End Call
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* FAB */}
-        <button
-          type="button"
-          onClick={handleToggle}
-          aria-label="Open Utsav Voice Agent"
-          style={{
-            position: 'relative',
-            width: '58px',
-            height: '58px',
-            borderRadius: '50%',
-            border: 'none',
-            cursor: 'pointer',
-            background: isOpen
-              ? 'linear-gradient(135deg,#ef4444,#b91c1c)'
-              : 'linear-gradient(135deg,var(--primary-saffron),var(--primary-magenta))',
-            boxShadow: '0 4px 20px rgba(230,81,0,.45)',
-            fontSize: '1.4rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: `scale(${isOpen ? btnScale : 1})`,
-            transition: 'transform .05s linear, background .2s',
-          }}
-        >
-          <span
-            className={`uv-ring ${isOpen ? (status === 'connecting' ? 'connecting' : '') : 'idle'}`}
-            style={{ transform: `scale(${isOpen && status === 'listening' ? ringScale : 1})` }}
-          />
-          {isOpen ? '✕' : '🎙️'}
-        </button>
-      </div>
-    </>
+    <VoicePanel
+      isOpen={isOpen}
+      status={status}
+      messages={messages}
+      transcriptRef={transcriptRef}
+      canConnect={canConnect}
+      micVolume={micVol}
+      onToggle={handleToggle}
+      onConnect={connect}
+      onDisconnect={disconnect}
+    />
   );
 };

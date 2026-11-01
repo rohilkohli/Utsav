@@ -42,7 +42,7 @@ REQUIREMENTS:
   } else if (input.eventType === 'community') {
     const subEventsStr =
       input.subEvents.length > 0
-        ? input.subEvents.join(', ')
+        ? wrapUserText(input.subEvents.join(', '))
         : 'Pandal Setup, Cultural Night, Visarjan';
     specificContext = `
 EVENT TYPE: Indian Community Celebration / Festival (e.g., Diwali Mela, Ganesh Utsav, Navratri Garba, Society Sports Day)
@@ -107,8 +107,8 @@ export function buildRefinePrompt(
     ? 'Generate all replacement ideas in Hindi (Devanagari script).'
     : 'Generate all replacement ideas in English.';
 
-  return `The user is planning a ${input.eventType} celebration in ${input.city}, India for ${input.guestCount} guests.
-The user wants to RE-GENERATE the personalized ideas for the "${section}" section with this specific instruction:
+  return `The user is planning a ${wrapUserText(input.eventType)} celebration in ${wrapUserText(input.city)}, India for ${input.guestCount} guests.
+The user wants to RE-GENERATE the personalized ideas for the "${wrapUserText(section)}" section with this specific instruction:
 
 <USER_INSTRUCTION>
 ${wrapUserText(instruction.trim().slice(0, 300))}

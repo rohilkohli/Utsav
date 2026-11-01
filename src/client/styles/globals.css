@@ -419,6 +419,38 @@ button,
 .voice-message--agent .voice-message__bubble { border: 1px solid var(--surface-border); background: var(--surface-card-hover); }
 .voice-message--tool .voice-message__bubble { border: 1px dashed #10b981; border-radius: 8px; background: rgba(16,185,129,.1); color: #10b981; font-family: monospace; }
 .voice-message--system .voice-message__bubble { padding: 0.25rem 0.6rem; color: var(--text-muted); font-style: italic; }
+.voice-launcher { position: fixed; right: 1.75rem; bottom: 1.75rem; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; }
+.voice-panel { width: 340px; max-height: 480px; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--surface-border); border-radius: var(--radius-lg); background: var(--surface-card); box-shadow: 0 8px 40px rgba(0,0,0,.25); }
+.voice-panel__header { display: flex; align-items: center; gap: 0.6rem; padding: 0.85rem 1rem; background: linear-gradient(135deg,var(--primary-saffron),var(--primary-magenta)); color: #fff; }
+.voice-panel__title { flex: 1; display: grid; gap: 0.2rem; font-size: 0.9rem; }
+.voice-panel__title span { display: flex; align-items: center; gap: 0.35rem; color: rgba(255,255,255,.8); font-size: 0.72rem; }
+.voice-panel__title i { width: 6px; height: 6px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+.voice-panel__close { padding: 0.2rem; border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 1.1rem; }
+.voice-panel__controls { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--surface-border); }
+.voice-panel__primary, .voice-panel__secondary { flex: 1; padding: 0.6rem; border-radius: var(--radius-md); cursor: pointer; font-weight: 700; }
+.voice-panel__primary { border: 0; background: linear-gradient(135deg,var(--primary-saffron),var(--primary-magenta)); color: #fff; }
+.voice-panel__secondary { border: 1px solid var(--surface-border); background: var(--surface-card-hover); color: var(--text-main); }
+.voice-fab { position: relative; width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: linear-gradient(135deg,var(--primary-saffron),var(--primary-magenta)); box-shadow: 0 4px 20px rgba(230,81,0,.45); color: #fff; cursor: pointer; font-size: 1.4rem; transition: transform .05s linear, background .2s; }
+.voice-fab--open { background: linear-gradient(135deg,#ef4444,#b91c1c); }
+
+@keyframes uv-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.15); }
+}
+@keyframes uv-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.uv-ring {
+  position: absolute;
+  inset: -10px;
+  border: 2px solid rgba(255, 111, 0, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  transition: transform 0.05s linear;
+}
+.uv-ring.idle { animation: uv-pulse 2.5s ease-in-out infinite; }
+.uv-ring.connecting { animation: uv-spin 1s linear infinite; border-style: dashed; }
 
 .describe-event {
   display: grid;
