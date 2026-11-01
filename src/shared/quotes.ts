@@ -1,30 +1,8 @@
-/**
- * Vendor quote analysis utilities.
- * Provides schema validation for vendor quotes and pure comparison logic
- * to evaluate quotes against budgeted amounts without any LLM calls.
- */
-import { z } from 'zod';
-
-/** Zod schema for validating an incoming vendor quote */
-export const vendorQuoteSchema = z.object({
-  id: z.string(),
-  vendorId: z.string(),
-  vendorName: z.string().min(1).max(200),
-  category: z.string().min(1),
-  quotedAmount: z.number().int().min(0),
-  totalPrice: z.number().int().min(0).optional(),
-  pricePerPlate: z.number().int().min(0).optional(),
-  guestMinimum: z.number().int().min(0).optional(),
-  taxIncluded: z.boolean().optional(),
-  advancePercent: z.number().min(0).max(100).optional(),
-  overtimeFee: z.string().max(300).optional(),
-  cancellationPolicy: z.string().max(500).optional(),
-  budgetedAmount: z.number().int().min(0),
-  notes: z.string().max(500).default(''),
-  receivedAt: z.string(), // ISO date string
-});
-
-export type VendorQuote = z.infer<typeof vendorQuoteSchema>;
+import type { PlanOutput } from './schemas.js';
+import { matchVendorBudgetCategory } from './vendorMatching.js';
+export { matchVendorBudgetCategory } from './vendorMatching.js';
+import type { VendorQuote } from './quoteSchemas.js';
+export * from './quoteSchemas.js';
 
 export type QuoteRisk =
   | 'guestMinimumExceedsGuests'
@@ -35,14 +13,19 @@ export type QuoteRisk =
   | 'noCancellationPolicy';
 
 export function effectiveCost(quote: VendorQuote, guestCount: number): number {
-  return quote.totalPrice ?? (quote.pricePerPlate ?? quote.quotedAmount) * Math.max(guestCount, quote.guestMinimum ?? 0);
+  return (
+    quote.totalPrice ??
+    (quote.pricePerPlate != null
+      ? quote.pricePerPlate * Math.max(0, Math.round(guestCount), quote.guestMinimum ?? 0)
+      : quote.quotedAmount)
+  );
 }
 
 export function riskFlags(quote: VendorQuote, guestCount: number): QuoteRisk[] {
   const risks: QuoteRisk[] = [];
   if ((quote.guestMinimum ?? 0) > guestCount) risks.push('guestMinimumExceedsGuests');
-  if (quote.quotedAmount > quote.budgetedAmount) risks.push('overCategoryBudget');
-  if (quote.taxIncluded === undefined) risks.push('taxNotStated');
+  if (effectiveCost(quote, guestCount) > quote.budgetedAmount) risks.push('overCategoryBudget');
+  if (quote.taxIncluded == null) risks.push('taxNotStated');
   if ((quote.advancePercent ?? 0) > 50) risks.push('advanceHigh');
   if (quote.overtimeFee) risks.push('overtimeFeeApplies');
   if (!quote.cancellationPolicy) risks.push('noCancellationPolicy');
@@ -51,18 +34,20 @@ export function riskFlags(quote: VendorQuote, guestCount: number): QuoteRisk[] {
 
 export function missingFields(quote: VendorQuote): string[] {
   const fields: string[] = [];
-  if (quote.taxIncluded === undefined) fields.push('whether GST and taxes are included');
-  if (quote.cancellationPolicy === undefined) fields.push('cancellation and refund policy');
-  if (quote.guestMinimum === undefined) fields.push('minimum plates or guest count');
-  if (quote.advancePercent === undefined) fields.push('advance payment percentage');
+  if (quote.taxIncluded == null) fields.push('whether GST and taxes are included');
+  if (!quote.cancellationPolicy?.trim()) fields.push('cancellation and refund policy');
+  if (quote.guestMinimum == null) fields.push('minimum plates or guest count');
+  if (quote.advancePercent == null) fields.push('advance payment percentage');
   return fields;
 }
 
 export function inquiryDraft(quote: VendorQuote, input: { familyName?: string }): string {
   const fields = missingFields(quote);
-  const greeting = input.familyName ? `Hello ${quote.vendorName}, this is ${input.familyName}.` : `Hello ${quote.vendorName},`;
+  const greeting = input.familyName
+    ? `Hello ${quote.vendorName}, this is ${input.familyName}.`
+    : `Hello ${quote.vendorName},`;
   return fields.length === 0
-    ? `${greeting} Thank you for the quotation. Could you please confirm the final total and availability?`
+    ? `${greeting} Thank you for the complete quotation. We have the details needed to compare options.`
     : `${greeting} Thank you for the quotation. Could you please confirm ${fields.join(', ')}? We are comparing options for our celebration.`;
 }
 
@@ -105,10 +90,10 @@ export function compareQuote(quote: VendorQuote): QuoteComparison {
   if (delta <= 0) {
     verdict = 'within-budget';
     recommendation = `${vendorName}'s quote for ${category} is within budget${delta < 0 ? ` — you save ₹${Math.abs(delta).toLocaleString('en-IN')}` : ''}.`;
-  } else if (deltaPercent <= 10) {
+  } else if (budgetedAmount > 0 && delta / budgetedAmount <= 0.1) {
     verdict = 'slightly-over';
     recommendation = `${vendorName}'s quote is ${deltaPercent}% over budget (₹${delta.toLocaleString('en-IN')} extra). Consider negotiating a small discount.`;
-  } else if (deltaPercent <= 25) {
+  } else if (budgetedAmount > 0 && delta / budgetedAmount <= 0.25) {
     verdict = 'over-budget';
     recommendation = `${vendorName}'s quote exceeds budget by ${deltaPercent}% (₹${delta.toLocaleString('en-IN')}). Negotiate or compare with 1-2 alternatives.`;
   } else {
@@ -117,4 +102,41 @@ export function compareQuote(quote: VendorQuote): QuoteComparison {
   }
 
   return { verdict, delta, deltaPercent, recommendation };
+}
+
+/** Accept atomically so every dashboard tab observes the same agreed cost. */
+export function acceptQuotation(
+  plan: PlanOutput,
+  vendorId: string,
+  quote: VendorQuote,
+  guestCount: number,
+): PlanOutput {
+  const vendor = plan.vendors.find((entry) => entry.id === vendorId);
+  if (!vendor || quote.vendorId !== vendorId) throw new Error('Quotation does not match a vendor');
+  const cost = effectiveCost(quote, guestCount);
+  const matching = matchVendorBudgetCategory(plan, vendor);
+  if (!matching) throw new Error('No matching budget category for this quotation');
+  const quotes = [...(vendor.quotes ?? []).filter((entry) => entry.id !== quote.id), quote];
+  return {
+    ...plan,
+    perPlate:
+      /cater|food|prasad/i.test(vendor.category) && quote.pricePerPlate != null
+        ? quote.pricePerPlate
+        : plan.perPlate,
+    budget: plan.budget.map((category) =>
+      category.id === matching.id ? { ...category, actual: cost, verified: true } : category,
+    ),
+    vendors: plan.vendors.map((entry) =>
+      entry.id === vendorId
+        ? {
+            ...entry,
+            status: 'booked',
+            quotedAmount: cost,
+            budgetedAmount: matching.amount,
+            quotes: quotes.slice(-3),
+            acceptedQuoteId: quote.id,
+          }
+        : entry,
+    ),
+  };
 }

@@ -1,9 +1,9 @@
-import type { BudgetCategory, EventType, PlanOutput } from './schemas.js';
-
-export interface BudgetPreset {
-  label: string;
-  value: number;
-}
+import { allocateAmountsByLargestRemainder, nonnegativeInteger } from './allocation.js';
+export { allocateAmountsByLargestRemainder } from './allocation.js';
+export { scaleGuests, type GuestScaleResult } from './budgetGuests.js';
+import type { BudgetCategory } from './schemas.js';
+import { requireValue } from './invariants.js';
+export { BUDGET_PRESETS, type BudgetPreset } from './budgetPresets.js';
 
 export interface BudgetCategoryInput {
   id: string;
@@ -11,137 +11,70 @@ export interface BudgetCategoryInput {
   suggestedPercent: number;
   actual?: number;
   subEvent?: string;
+  locked?: boolean;
+  verified?: boolean;
+  priority?: boolean;
 }
 
-/** Ensure generated plans reserve 10% for an explicit contingency buffer. */
-export function ensureContingencyCategory<T extends BudgetCategoryInput>(categories: T[]): T[] {
-  if (categories.some((category) => category.category.toLowerCase().includes('contingency'))) {
-    return categories;
-  }
+/** Reserve exactly 10% by normalizing arbitrary creative weights first. */
+export function ensureContingencyCategory(
+  categories: BudgetCategoryInput[],
+): BudgetCategoryInput[] {
+  if (categories.some((category) => /contingency/i.test(category.category))) return categories;
+  const sum = categories.reduce(
+    (total, category) => total + Math.max(0, category.suggestedPercent),
+    0,
+  );
   return [
     ...categories.map((category) => ({
       ...category,
-      suggestedPercent: category.suggestedPercent * 0.9,
+      suggestedPercent:
+        sum > 0 ? (Math.max(0, category.suggestedPercent) * 90) / sum : 90 / categories.length,
     })),
-    {
-      id: 'contingency-buffer',
-      category: 'Contingency Buffer',
-      suggestedPercent: 10,
-    } as T,
+    { id: 'contingency-buffer', category: 'Contingency Buffer', suggestedPercent: 10 },
   ];
 }
 
-export const BUDGET_PRESETS: Record<EventType, BudgetPreset[]> = {
-  birthday: [
-    { label: '₹15,000 (Intimate)', value: 15_000 },
-    { label: '₹35,000 (Standard)', value: 35_000 },
-    { label: '₹75,000 (Grand)', value: 75_000 },
-    { label: '₹1,50,000+ (Luxury)', value: 150_000 },
-  ],
-  community: [
-    { label: '₹50,000 (Small Pandal)', value: 50_000 },
-    { label: '₹1,50,000 (Society Mela)', value: 150_000 },
-    { label: '₹3,00,000 (City Pandal)', value: 300_000 },
-    { label: '₹5,00,000+ (Grand Mahotsav)', value: 500_000 },
-  ],
-  wedding: [
-    { label: '₹5,00,000 (Budget Intimate)', value: 500_000 },
-    { label: '₹15,00,000 (Traditional)', value: 1_500_000 },
-    { label: '₹30,00,000 (Grand Celebration)', value: 3_000_000 },
-    { label: '₹60,00,000+ (Royal Destination)', value: 6_000_000 },
-  ],
-};
-
-/**
- * Largest-Remainder Method (Hare-Niemeyer method).
- * Distributes totalBudget across categories using percentages such that
- * the sum of rounded integer amounts equals EXACTLY totalBudget (no penny drift).
- *
- * Algorithm:
- * 1. Compute exact rupee share for each category (percent × total).
- * 2. Floor all shares to integers and track remainders.
- * 3. Sort by remainder descending; award 1 extra rupee to top-N categories
- *    until the total discrepancy is resolved.
- *
- * @param items - Array of objects with a `suggestedPercent` field
- * @param totalBudget - Total rupee amount to distribute (must be >= 0)
- * @returns Array of integer rupee amounts in the same order as `items`
- */
-export function allocateAmountsByLargestRemainder(
-  items: { suggestedPercent: number }[],
-  totalBudget: number,
-): number[] {
-  if (items.length === 0) return [];
-  if (totalBudget <= 0) return items.map(() => 0);
-
-  const rawSum = items.reduce((acc, curr) => acc + curr.suggestedPercent, 0);
-  // Avoid division by zero: if all percentages are 0, allocate evenly
-  const effectivePercents =
-    rawSum > 0 ? items.map((i) => i.suggestedPercent / rawSum) : items.map(() => 1 / items.length);
-
-  // Step 1: exact shares and integer floors
-  const exactShares = effectivePercents.map((p) => p * totalBudget);
-  const integerParts = exactShares.map((s) => Math.floor(s));
-  const remainders = exactShares.map((s, idx) => ({
-    remainder: s - (integerParts[idx] ?? 0),
-    index: idx,
-  }));
-
-  // Step 2: compute discrepancy
-  const allocatedSoFar = integerParts.reduce((a, b) => a + b, 0);
-  let discrepancy = Math.round(totalBudget - allocatedSoFar);
-
-  // Step 3: distribute 1 rupee to items with largest remainders
-  remainders.sort((a, b) => b.remainder - a.remainder);
-  const result = [...integerParts];
-
-  for (let i = 0; i < remainders.length && discrepancy > 0; i++) {
-    const remainder = remainders[i]!;
-    result[remainder.index] = (result[remainder.index] ?? 0) + 1;
-    discrepancy--;
-  }
-
-  return result;
-}
-
-/**
- * Normalizes raw categories (re-scaling percentages to sum to 100%) and
- * calculates deterministic integer rupee amounts via the Largest-Remainder method.
- * If all percentages are zero, allocates the budget evenly across all categories.
- *
- * @param categories - Array of category objects with id, category name, suggestedPercent, and optional actual/subEvent
- * @param totalBudget - Total rupee budget to distribute
- * @returns Fully populated BudgetCategory array with normalized percents and exact rupee amounts
- */
+/** Apply user priorities before allocation; contingency stays at its reserved weight. */
 export function populateCategoryAmounts(
   categories: BudgetCategoryInput[],
   totalBudget: number,
+  priorities: string[] = [],
 ): BudgetCategory[] {
-  const rawSum = categories.reduce((sum, c) => sum + Math.max(0, c.suggestedPercent), 0);
-  const normalizedPercents =
-    rawSum > 0
-      ? categories.map((c) => Number(((Math.max(0, c.suggestedPercent) / rawSum) * 100).toFixed(2)))
-      : categories.map(() => Number((100 / Math.max(1, categories.length)).toFixed(2)));
-
-  const amounts = allocateAmountsByLargestRemainder(
-    normalizedPercents.map((p) => ({ suggestedPercent: p })),
-    totalBudget,
+  const weighted = categories.map((category) => ({
+    ...category,
+    priority:
+      category.priority ??
+      priorities.some((priority) =>
+        category.category.toLowerCase().includes(priority.toLowerCase()),
+      ),
+  }));
+  const regular = weighted.filter((category) => !/contingency/i.test(category.category));
+  const base = regular.reduce((sum, category) => sum + Math.max(0, category.suggestedPercent), 0);
+  const priorityTotal = regular.reduce(
+    (sum, category) =>
+      sum + Math.max(0, category.suggestedPercent) * (category.priority ? 1.25 : 1),
+    0,
   );
-
-  return categories.map((c, idx) => ({
-    ...(() => {
-      const amount = amounts[idx] ?? 0;
-      return {
-        suggestedPercent: normalizedPercents[idx] ?? 0,
-        amount,
-        actual: c.actual !== undefined ? c.actual : amount,
-      };
-    })(),
-    id: c.id,
-    category: c.category,
-    locked: false,
-    verified: false,
-    subEvent: c.subEvent,
+  const allocationWeights = weighted.map((category) => ({
+    suggestedPercent:
+      /contingency/i.test(category.category) || priorityTotal === 0
+        ? Math.max(0, category.suggestedPercent)
+        : (Math.max(0, category.suggestedPercent) * (category.priority ? 1.25 : 1) * base) /
+          priorityTotal,
+  }));
+  const amounts = allocateAmountsByLargestRemainder(allocationWeights, totalBudget);
+  const sum = allocationWeights.reduce((total, item) => total + item.suggestedPercent, 0);
+  return weighted.map((category, index) => ({
+    ...category,
+    suggestedPercent:
+      sum > 0
+        ? (requireValue(allocationWeights[index]).suggestedPercent * 100) / sum
+        : 100 / weighted.length,
+    amount: requireValue(amounts[index]),
+    actual: category.actual ?? requireValue(amounts[index]),
+    locked: category.locked ?? false,
+    verified: category.verified ?? false,
   }));
 }
 
@@ -150,90 +83,49 @@ export interface BudgetChange {
   category: string;
   delta: number;
 }
-
 export interface RedistributionResult {
   categories: BudgetCategory[];
   changes: BudgetChange[];
 }
-
-export interface GuestScaleResult {
-  plan: PlanOutput;
-  requiredCatering: number;
-  budgetedCatering: number;
-  shortfall: number;
-}
-
-export function scaleGuests(plan: PlanOutput, newGuestCount: number, perPlate = plan.perPlate ?? 0): GuestScaleResult {
-  const guests = Math.max(0, Math.round(newGuestCount));
-  const rate = Math.max(0, Math.round(perPlate));
-  const catering = plan.budget.find((category) => /cater|food|prasad/i.test(category.category));
-  const requiredCatering = guests * rate;
-  const budgetedCatering = catering?.amount ?? 0;
-  const updatedBudget = catering
-    ? plan.budget.map((category) => category.id === catering.id ? { ...category, actual: requiredCatering } : category)
-    : plan.budget;
-  return {
-    plan: { ...plan, perPlate: rate, budget: updatedBudget },
-    requiredCatering,
-    budgetedCatering,
-    shortfall: Math.max(0, requiredCatering - budgetedCatering),
-  };
-}
-
-/**
- * Move a category allocation while keeping the plan total exact. The delta is
- * spread across unlocked peers using largest-remainder rounding.
- */
+/** Cap changes at the unlocked pool and never alter accepted actual costs. */
 export function redistribute(
   categories: BudgetCategory[],
   categoryId: string,
   newAmount: number,
 ): RedistributionResult {
-  const targetIndex = categories.findIndex((category) => category.id === categoryId);
-  if (targetIndex < 0 || categories.length === 0) return { categories, changes: [] };
-
-  const target = categories[targetIndex]!;
-  const unlockedPeers = categories.filter(
-    (category, index) => index !== targetIndex && !category.locked,
-  );
-  if (target.locked || unlockedPeers.length === 0) return { categories, changes: [] };
-
-  const currentAmount = target.amount;
-  const requestedDelta = Math.round(newAmount) - currentAmount;
-  const available =
-    requestedDelta > 0
-      ? unlockedPeers.reduce((sum, category) => sum + category.amount, 0)
-      : Number.POSITIVE_INFINITY;
-  const delta = requestedDelta > 0 ? Math.min(requestedDelta, available) : requestedDelta;
+  const requested = nonnegativeInteger(newAmount);
+  const target = categories.find((category) => category.id === categoryId);
+  const peers = categories.filter((category) => category.id !== categoryId && !category.locked);
+  if (!target || target.locked || peers.length === 0) return { categories, changes: [] };
+  const pool = peers.reduce((sum, category) => sum + category.amount, 0);
+  const delta = Math.min(requested - target.amount, pool);
   if (delta === 0) return { categories, changes: [] };
-
-  const peerTotal = unlockedPeers.reduce((sum, category) => sum + category.amount, 0);
-  const peerAmounts = allocateAmountsByLargestRemainder(
-    unlockedPeers.map((category) => ({
-      suggestedPercent: peerTotal > 0 ? category.amount / peerTotal : 1,
-    })),
-    Math.max(0, peerTotal - delta),
+  const amounts = allocateAmountsByLargestRemainder(
+    peers.map((category) => ({ suggestedPercent: category.amount })),
+    pool - delta,
   );
-  let peerIndex = 0;
-  const updated = categories.map((category, index) => {
-    if (index === targetIndex) return { ...category, amount: currentAmount + delta };
-    if (category.locked) return category;
-    const amount = peerAmounts[peerIndex++] ?? category.amount;
+  const peerAmounts = new Map(
+    peers.map((category, index) => [category.id, requireValue(amounts[index])]),
+  );
+  const total = categories.reduce((sum, category) => sum + category.amount, 0);
+  const updated = categories.map((category) => {
+    const amount =
+      category.id === categoryId ? target.amount + delta : peerAmounts.get(category.id);
+    if (amount === undefined) return category;
     return {
       ...category,
       amount,
-      actual: category.actual === category.amount ? amount : category.actual,
+      suggestedPercent: (amount * 100) / total,
+      actual: !category.verified && category.actual === category.amount ? amount : category.actual,
     };
   });
-
-  const changes = updated
-    .map((category, index) => ({
-      id: category.id,
-      category: category.category,
-      delta: category.amount - categories[index]!.amount,
-    }))
-    .filter((change) => change.delta !== 0);
-  return { categories: updated, changes };
+  return {
+    categories: updated,
+    changes: updated.flatMap((category, index) => {
+      const change = category.amount - requireValue(categories[index]).amount;
+      return change === 0 ? [] : [{ id: category.id, category: category.category, delta: change }];
+    }),
+  };
 }
 
 export interface BudgetTotals {
@@ -244,70 +136,84 @@ export interface BudgetTotals {
   overBudgetAmount: number;
   underBudgetAmount: number;
 }
-
-/**
- * Computes aggregated budget totals from a set of BudgetCategory entries.
- * Pure calculation — no LLM, no side-effects.
- *
- * @param categories - Array of BudgetCategory with `amount` (planned) and `actual` (spent) fields
- * @param totalBudget - The user's declared total budget
- * @returns BudgetTotals with totalBudgeted, totalActual, difference, isOverBudget, and over/under amounts
- */
 export function calculateBudgetTotals(
   categories: BudgetCategory[],
   totalBudget: number,
 ): BudgetTotals {
-  const totalBudgeted = categories.reduce((acc, c) => acc + c.amount, 0);
-  const totalActual = categories.reduce((acc, c) => acc + c.actual, 0);
+  const totalBudgeted = categories.reduce((sum, category) => sum + category.amount, 0);
+  const totalActual = categories.reduce((sum, category) => sum + category.actual, 0);
   const difference = totalActual - totalBudget;
-  const isOverBudget = difference > 0;
-
   return {
     totalBudgeted,
     totalActual,
     difference,
-    isOverBudget,
-    overBudgetAmount: isOverBudget ? difference : 0,
-    underBudgetAmount: !isOverBudget ? Math.abs(difference) : 0,
+    isOverBudget: difference > 0,
+    overBudgetAmount: Math.max(0, difference),
+    underBudgetAmount: Math.max(0, -difference),
   };
 }
 
-/**
- * Deterministically reduces the total budget by a given percentage and
- * re-allocates all category amounts using the Largest-Remainder method.
- *
- * @param categories - Current BudgetCategory array
- * @param currentTotal - Current total budget in rupees
- * @param percentCut - Percentage to cut (0-100); clamped to 0 minimum
- * @returns Object with `newTotal` (integer rupees) and `updatedCategories` (re-allocated)
- */
+export function resizeBudget(
+  categories: BudgetCategory[],
+  requestedTotal: number,
+): {
+  newTotal: number;
+  updatedCategories: BudgetCategory[];
+} {
+  const fixedTotal = categories
+    .filter((category) => category.locked)
+    .reduce((sum, category) => sum + category.amount, 0);
+  const newTotal = Math.max(fixedTotal, nonnegativeInteger(requestedTotal));
+  const unlocked = categories.filter((category) => !category.locked);
+  const weights = unlocked.map((category) => ({
+    suggestedPercent: category.amount > 0 ? category.amount : category.suggestedPercent,
+  }));
+  const amounts = allocateAmountsByLargestRemainder(weights, newTotal - fixedTotal);
+  const byId = new Map(
+    unlocked.map((category, index) => [category.id, requireValue(amounts[index])]),
+  );
+  return {
+    newTotal: unlocked.length === 0 ? fixedTotal : newTotal,
+    updatedCategories: categories.map((category) => {
+      const amount = byId.get(category.id);
+      if (amount === undefined) return category;
+      return {
+        ...category,
+        amount,
+        suggestedPercent: newTotal > 0 ? (amount * 100) / newTotal : 0,
+        actual:
+          !category.verified && category.actual === category.amount ? amount : category.actual,
+      };
+    }),
+  };
+}
+
 export function applyBudgetCut(
   categories: BudgetCategory[],
   currentTotal: number,
   percentCut: number,
-): { newTotal: number; updatedCategories: BudgetCategory[] } {
-  const factor = Math.max(0, (100 - percentCut) / 100);
-  const newTotal = Math.round(currentTotal * factor);
-  const updatedCategories = populateCategoryAmounts(categories, newTotal);
-  return { newTotal, updatedCategories };
+): {
+  newTotal: number;
+  updatedCategories: BudgetCategory[];
+} {
+  return resizeBudget(
+    categories,
+    currentTotal * (1 - Math.min(100, Math.max(0, percentCut)) / 100),
+  );
 }
 
-/**
- * Groups BudgetCategory entries by their `subEvent` field.
- * Categories with no subEvent are placed under the key `'General'`.
- * Used by the dashboard to render per-ceremony budget breakdowns.
- *
- * @param categories - Array of BudgetCategory entries
- * @returns Record mapping subEvent name → array of BudgetCategory items
- */
 export function groupCategoriesBySubEvent(
   categories: BudgetCategory[],
 ): Record<string, BudgetCategory[]> {
   const groups: Record<string, BudgetCategory[]> = {};
-  for (const cat of categories) {
-    const key = cat.subEvent?.trim() || 'General';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(cat);
+  for (const category of categories) {
+    const label = category.subEvent?.trim() ?? '';
+    const key = label.length > 0 ? label : 'General';
+    Object.defineProperty(groups, key, {
+      value: [...(Object.hasOwn(groups, key) ? requireValue(groups[key]) : []), category],
+      enumerable: true,
+      configurable: true,
+    });
   }
   return groups;
 }

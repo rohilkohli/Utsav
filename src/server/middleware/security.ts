@@ -1,7 +1,7 @@
 import helmet from 'helmet';
 import type { Request, RequestHandler, Response } from 'express';
 
-const firebaseProject = process.env.FIREBASE_PROJECT_ID || '*';
+const firebaseProject = process.env.FIREBASE_PROJECT_ID ?? '*';
 
 const helmetMiddleware = helmet({
   contentSecurityPolicy: {
@@ -47,7 +47,7 @@ export const securityHeaders: RequestHandler = (req: Request, res: Response, nex
 function expectedHost(req: Request): string {
   const forwardedHost = req.headers['x-forwarded-host'];
   return (
-    (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || ''
+    (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) ?? req.headers.host ?? ''
   );
 }
 
@@ -70,7 +70,7 @@ export const sameOriginGuard: RequestHandler = (req, res, next) => {
     return;
   }
 
-  const contentType = req.headers['content-type']?.toLowerCase() || '';
+  const contentType = req.headers['content-type']?.toLowerCase() ?? '';
   if (!contentType.startsWith('application/json')) {
     res.status(415).json({ error: 'UNSUPPORTED_MEDIA_TYPE' });
     return;

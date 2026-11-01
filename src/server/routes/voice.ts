@@ -3,107 +3,133 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import WebSocket, { WebSocketServer } from 'ws';
 
+const router = Router();
+const windows = new Map<string, { startedAt: number; count: number }>();
+const MAX_QUEUE_BYTES = 262144;
+const MAX_MESSAGE_BYTES = 1048576;
 const voiceLimiter = rateLimit({
   windowMs: 60_000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
 });
+router.get('/voice/session', voiceLimiter, (_request, response) => {
+  response.status(410).json({ error: 'Voice sessions use the server relay.' });
+});
 
-const router = Router();
-const upstreamPath =
-  '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
-const connectionWindows = new Map<string, { startedAt: number; count: number }>();
-
-function clientIp(request: IncomingMessage): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  return (
-    (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]) ||
-    request.socket.remoteAddress ||
-    'unknown'
-  );
-}
-
-function isSameOrigin(request: IncomingMessage): boolean {
-  const origin = request.headers.origin;
-  const forwardedHost = request.headers['x-forwarded-host'];
-  const host =
-    (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || request.headers.host;
+function sameOrigin(request: IncomingMessage): boolean {
+  const forwarded = request.headers['x-forwarded-host'];
+  const host = (Array.isArray(forwarded) ? forwarded[0] : forwarded) ?? request.headers.host;
   try {
-    return Boolean(origin && host && new URL(origin).host === host);
+    return Boolean(request.headers.origin && host && new URL(request.headers.origin).host === host);
   } catch {
     return false;
   }
 }
-
 function allowConnection(request: IncomingMessage): boolean {
   const now = Date.now();
-  const key = clientIp(request);
-  const window = connectionWindows.get(key);
-  if (!window || now - window.startedAt >= 60_000) {
-    connectionWindows.set(key, { startedAt: now, count: 1 });
+  for (const [key, value] of windows) if (now - value.startedAt >= 60000) windows.delete(key);
+  // Use the rightmost hop, matching Express trust proxy: 1 (not a spoofable first hop).
+  const forwarded = request.headers['x-forwarded-for'];
+  const hops = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded)?.split(',');
+  const key = hops?.at(-1)?.trim() ?? request.socket.remoteAddress ?? 'unknown';
+  const value = windows.get(key);
+  if (!value) {
+    if (windows.size >= 10000) return false;
+    windows.set(key, { startedAt: now, count: 1 });
     return true;
   }
-  if (window.count >= 10) return false;
-  window.count += 1;
+  if (value.count >= 10) return false;
+  value.count++;
   return true;
 }
 
-router.get('/voice/session', voiceLimiter, (_req, res) => {
-  res.status(410).json({ error: 'Voice sessions use the server relay.' });
-});
-
+/** Internal-only upstream URL: credentials and upstream error details never reach clients. */
 export function attachVoiceWebSocket(server: Server): void {
-  const socketServer = new WebSocketServer({ noServer: true });
-
+  const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   server.on('upgrade', (request, socket, head) => {
-    const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
-    if (requestUrl.pathname !== '/api/voice/ws') return;
-
-    if (!isSameOrigin(request) || !allowConnection(request)) {
-      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+    if (request.url?.split('?')[0] !== '/api/voice/ws') return;
+    const deny = (status: string) => {
+      socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
       socket.destroy();
+    };
+    if (!sameOrigin(request)) {
+      deny('403 Forbidden');
       return;
     }
-
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your-gemini-api-key-here') {
-      socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
-      socket.destroy();
+    if (!allowConnection(request)) {
+      deny('429 Too Many Requests');
       return;
     }
-
-    socketServer.handleUpgrade(request, socket, head, (client) => {
-      socketServer.emit('connection', client, request);
+    const key = process.env.GEMINI_API_KEY;
+    if (!key || key === 'your-gemini-api-key-here') {
+      deny('503 Service Unavailable');
+      return;
+    }
+    sockets.handleUpgrade(request, socket, head, (client) => {
+      sockets.emit('connection', client);
     });
   });
-
-  socketServer.on('connection', (client, request) => {
+  sockets.on('connection', (client) => {
     const upstream = new WebSocket(
-      `wss://generativelanguage.googleapis.com${upstreamPath}?key=${encodeURIComponent(process.env.GEMINI_API_KEY || '')}`,
+      `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY ?? '')}`,
+      { handshakeTimeout: 10000, maxPayload: MAX_MESSAGE_BYTES },
     );
-    const pending: Buffer[] = [];
-
-    upstream.on('open', () => {
-      for (const message of pending) upstream.send(message);
+    const pending: { data: Buffer; binary: boolean }[] = [];
+    let queuedBytes = 0;
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
       pending.length = 0;
-    });
-    client.on('message', (message) => {
-      if (upstream.readyState === WebSocket.OPEN) upstream.send(message);
-      else pending.push(Buffer.from(message as Uint8Array));
-    });
-    upstream.on('message', (message) => {
-      if (client.readyState === WebSocket.OPEN) client.send(message);
-    });
-    const closeBoth = () => {
-      if (client.readyState === WebSocket.OPEN) client.close();
+      queuedBytes = 0;
+      if (client.readyState === WebSocket.OPEN) client.close(1011, 'Voice connection ended');
+      else if (client.readyState !== WebSocket.CLOSED) client.terminate();
       if (upstream.readyState === WebSocket.OPEN) upstream.close();
+      else if (upstream.readyState !== WebSocket.CLOSED) upstream.terminate();
     };
-    client.on('close', closeBoth);
-    upstream.on('close', closeBoth);
-    client.on('error', closeBoth);
-    upstream.on('error', closeBoth);
-    void request;
+    upstream.on('open', () => {
+      if (closed) {
+        upstream.close();
+        return;
+      }
+      for (const message of pending) upstream.send(message.data, { binary: message.binary });
+      pending.length = 0;
+      queuedBytes = 0;
+    });
+    client.on('message', (data, binary) => {
+      if (closed) return;
+      const buffer = Array.isArray(data)
+        ? Buffer.concat(data)
+        : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
+      if (upstream.bufferedAmount + buffer.length > MAX_QUEUE_BYTES) {
+        close();
+        return;
+      }
+      if (upstream.readyState === WebSocket.OPEN) upstream.send(buffer, { binary });
+      else if (
+        upstream.readyState === WebSocket.CONNECTING &&
+        queuedBytes + buffer.length <= MAX_QUEUE_BYTES
+      ) {
+        pending.push({ data: buffer, binary });
+        queuedBytes += buffer.length;
+      } else close();
+    });
+    upstream.on('message', (data, binary) => {
+      if (client.readyState !== WebSocket.OPEN || client.bufferedAmount > MAX_QUEUE_BYTES) {
+        close();
+        return;
+      }
+      client.send(data, { binary });
+    });
+    client.on('error', close);
+    upstream.on('error', close);
+    client.on('close', close);
+    upstream.on('close', close);
+  });
+  server.on('close', () => {
+    for (const client of sockets.clients) client.terminate();
+    sockets.close();
   });
 }
-
 export default router;

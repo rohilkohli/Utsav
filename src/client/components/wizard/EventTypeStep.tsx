@@ -1,8 +1,11 @@
+import type { FieldErrors } from './useWizardForm';
+import './EventTypeStep.css';
 import React from 'react';
 import type { EventType } from '@shared/schemas';
 import { WEDDING_SUB_EVENTS, COMMUNITY_SUB_EVENTS } from '@shared/schemas';
 
 interface EventTypeStepProps {
+  errors?: FieldErrors;
   eventType: EventType;
   subEvents: string[];
   onChangeType: (type: EventType) => void;
@@ -14,14 +17,15 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
   subEvents,
   onChangeType,
   onToggleSubEvent,
+  errors = {},
 }) => {
-  const options: Array<{
+  const options: {
     type: EventType;
     icon: string;
     title: string;
     subtitle: string;
     popularSubEvents?: readonly string[];
-  }> = [
+  }[] = [
     {
       type: 'wedding',
       icon: '💍',
@@ -46,22 +50,19 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
 
   return (
     <div>
-      <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-        What are you celebrating?
-      </h2>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+      <h2 className={['event-type-step-h2-1'].join(' ')}>What are you celebrating?</h2>
+      <p className={['event-type-step-p-2'].join(' ')}>
         Select your celebration type to customize functions, budgets, and permits.
       </p>
 
       <div
+        id="event-ceremonies"
+        tabIndex={-1}
+        aria-invalid={Boolean(errors.subEvents)}
+        aria-describedby={errors.subEvents ? 'event-ceremonies-error' : undefined}
         role="radiogroup"
         aria-label="Event Type"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1rem',
-          marginBottom: '2rem',
-        }}
+        className={['event-type-step-div-3'].join(' ')}
       >
         {options.map((opt) => {
           const isSelected = eventType === opt.type;
@@ -71,70 +72,48 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
               type="button"
               role="radio"
               aria-checked={isSelected}
-              onClick={() => onChangeType(opt.type)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                textAlign: 'left',
-                padding: '1.25rem',
-                borderRadius: 'var(--radius-lg)',
-                border: isSelected
-                  ? '2px solid var(--primary-saffron)'
-                  : '1px solid var(--surface-border)',
-                background: isSelected ? 'var(--surface-card-hover)' : 'var(--surface-card)',
-                boxShadow: isSelected
-                  ? '0 0 0 1px var(--primary-saffron)'
-                  : 'var(--surface-shadow)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
+              onClick={() => {
+                onChangeType(opt.type);
               }}
+              className={[
+                'event-type-step-button-4',
+                isSelected
+                  ? 'event-type-step-button-4-border-yes'
+                  : 'event-type-step-button-4-border-no',
+                isSelected
+                  ? 'event-type-step-button-4-background-yes'
+                  : 'event-type-step-button-4-background-no',
+                isSelected
+                  ? 'event-type-step-button-4-boxshadow-yes'
+                  : 'event-type-step-button-4-boxshadow-no',
+              ].join(' ')}
             >
-              <span style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>{opt.icon}</span>
-              <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                {opt.title}
-              </span>
-              <span
-                style={{
-                  fontSize: '0.85rem',
-                  color: 'var(--text-muted)',
-                  marginTop: '0.25rem',
-                  lineHeight: 1.4,
-                }}
-              >
-                {opt.subtitle}
-              </span>
+              <span className={['event-type-step-span-5'].join(' ')}>{opt.icon}</span>
+              <span className={['event-type-step-span-6'].join(' ')}>{opt.title}</span>
+              <span className={['event-type-step-span-7'].join(' ')}>{opt.subtitle}</span>
             </button>
           );
         })}
       </div>
 
+      {errors.subEvents && (
+        <p id="event-ceremonies-error" className="wizard-field-error">
+          {errors.subEvents}
+        </p>
+      )}
       {eventType === 'wedding' && (
-        <div
-          style={{
-            background: 'var(--surface-card)',
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--surface-border)',
-          }}
-        >
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-magenta)' }}>
+        <div className={['event-type-step-div-8'].join(' ')}>
+          <div className={['event-type-step-div-9'].join(' ')}>
+            <h3 className={['event-type-step-h3-10'].join(' ')}>
               Select Wedding Functions & Ceremonies:
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <p className={['event-type-step-p-11'].join(' ')}>
               Each ceremony will receive dedicated timeline milestones, vendors, and budget
               breakdowns.
             </p>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.6rem',
-            }}
-          >
+          <div className={['event-type-step-div-12'].join(' ')}>
             {WEDDING_SUB_EVENTS.map((subEvent) => {
               const active = subEvents.includes(subEvent);
               return (
@@ -142,20 +121,21 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
                   key={subEvent}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => onToggleSubEvent(subEvent)}
-                  style={{
-                    padding: '0.45rem 0.9rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    borderRadius: 'var(--radius-full)',
-                    border: active
-                      ? '1px solid var(--primary-magenta)'
-                      : '1px solid var(--surface-border)',
-                    background: active ? 'var(--primary-magenta)' : 'transparent',
-                    color: active ? '#ffffff' : 'var(--text-main)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                  onClick={() => {
+                    onToggleSubEvent(subEvent);
                   }}
+                  className={[
+                    'event-type-step-button-13',
+                    active
+                      ? 'event-type-step-button-13-border-yes'
+                      : 'event-type-step-button-13-border-no',
+                    active
+                      ? 'event-type-step-button-13-background-yes'
+                      : 'event-type-step-button-13-background-no',
+                    active
+                      ? 'event-type-step-button-13-color-yes'
+                      : 'event-type-step-button-13-color-no',
+                  ].join(' ')}
                 >
                   {active ? '✓ ' : '+ '}
                   {subEvent}
@@ -167,30 +147,17 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
       )}
 
       {eventType === 'community' && (
-        <div
-          style={{
-            background: 'var(--surface-card)',
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--surface-border)',
-          }}
-        >
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-emerald)' }}>
+        <div className={['event-type-step-div-14'].join(' ')}>
+          <div className={['event-type-step-div-15'].join(' ')}>
+            <h3 className={['event-type-step-h3-16'].join(' ')}>
               Select Festival Stages & Events:
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <p className={['event-type-step-p-17'].join(' ')}>
               Permissions checklist (Police, Sound, Municipal NOC) will be automatically included.
             </p>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.6rem',
-            }}
-          >
+          <div className={['event-type-step-div-18'].join(' ')}>
             {COMMUNITY_SUB_EVENTS.map((subEvent) => {
               const active = subEvents.includes(subEvent);
               return (
@@ -198,20 +165,21 @@ export const EventTypeStep: React.FC<EventTypeStepProps> = ({
                   key={subEvent}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => onToggleSubEvent(subEvent)}
-                  style={{
-                    padding: '0.45rem 0.9rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    borderRadius: 'var(--radius-full)',
-                    border: active
-                      ? '1px solid var(--primary-emerald)'
-                      : '1px solid var(--surface-border)',
-                    background: active ? 'var(--primary-emerald)' : 'transparent',
-                    color: active ? '#ffffff' : 'var(--text-main)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                  onClick={() => {
+                    onToggleSubEvent(subEvent);
                   }}
+                  className={[
+                    'event-type-step-button-19',
+                    active
+                      ? 'event-type-step-button-19-border-yes'
+                      : 'event-type-step-button-19-border-no',
+                    active
+                      ? 'event-type-step-button-19-background-yes'
+                      : 'event-type-step-button-19-background-no',
+                    active
+                      ? 'event-type-step-button-19-color-yes'
+                      : 'event-type-step-button-19-color-no',
+                  ].join(' ')}
                 >
                   {active ? '✓ ' : '+ '}
                   {subEvent}

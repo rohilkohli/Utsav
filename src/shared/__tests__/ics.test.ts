@@ -51,7 +51,14 @@ describe('Calendar Export - RFC 5545 & Google Calendar', () => {
     const longTitle = 'शुभ '.repeat(30);
     const folded = foldLine(`SUMMARY:${longTitle}`);
     expect(folded.every((line) => Buffer.byteLength(line, 'utf8') <= 75)).toBe(true);
-    const ics = generateICS([{ title: 'Delayed task', description: 'Moved', dateStr: '2026-11-14', effectiveDate: '2026-11-18' }]);
+    const ics = generateICS([
+      {
+        title: 'Delayed task',
+        description: 'Moved',
+        dateStr: '2026-11-14',
+        effectiveDate: '2026-11-18',
+      },
+    ]);
     expect(ics).toContain('DTSTART;VALUE=DATE:20261118');
   });
 });

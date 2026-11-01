@@ -77,14 +77,16 @@ export function getPlanRepository(): PlanRepository {
   if (!activePlanRepo) {
     initRepositories();
   }
-  return activePlanRepo!;
+  if (!activePlanRepo) throw new Error('Plan repository initialization failed');
+  return activePlanRepo;
 }
 
 export function getShareRepository(): ShareRepository {
   if (!activeShareRepo) {
     initRepositories();
   }
-  return activeShareRepo!;
+  if (!activeShareRepo) throw new Error('Share repository initialization failed');
+  return activeShareRepo;
 }
 
 export function getActiveStoreType(): 'firestore' | 'in-memory' | null {

@@ -14,6 +14,7 @@ import voiceRoutes, { attachVoiceWebSocket } from './routes/voice.js';
 import askPlannerRoutes from './routes/askPlanner.js';
 import parseIntakeRoutes from './routes/parseIntake.js';
 import explainTradeoffsRoutes from './routes/explainTradeoffs.js';
+import extractQuoteRoutes from './routes/extractQuote.js';
 import { validateEnv } from './env.js';
 import { initRepositories } from './repositories/index.js';
 
@@ -52,6 +53,7 @@ export function createApp(): express.Application {
   app.use('/api', askPlannerRoutes);
   app.use('/api', parseIntakeRoutes);
   app.use('/api', explainTradeoffsRoutes);
+  app.use('/api', extractQuoteRoutes);
 
   // In production or when client is built, serve client assets
   const clientDist = path.resolve(__dirname, '../client');
@@ -91,7 +93,7 @@ export function createApp(): express.Application {
 }
 
 const app = createApp();
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
 if (process.env.NODE_ENV !== 'test') {
   try {

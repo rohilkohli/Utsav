@@ -116,6 +116,6 @@ ${wrapUserText(instruction.trim().slice(0, 300))}
 
 ${langPrompt}
 
-Generate 3 to 5 fresh, creative ideas exclusively for the "${section}" section that directly fulfill the user's instruction.
+Generate 3 to 5 fresh, creative ideas exclusively for the "${wrapUserText(section)}" section that directly fulfill the user's instruction.
 Return the ideas matching the requested schema.`;
 }

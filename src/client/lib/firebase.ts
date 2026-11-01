@@ -67,25 +67,32 @@ export function subscribeToAuthChanges(callback: (user: User | null) => void): (
 
   if (!hasPreviousSession) {
     callback(null);
-    return () => {};
+    return () => undefined;
   }
 
   let unsubscribe: (() => void) | null = null;
-  initFirebase().then(async (authInstance) => {
-    if (authInstance) {
-      const { onAuthStateChanged } = await import('firebase/auth');
-      unsubscribe = onAuthStateChanged(authInstance, (u) => {
-        if (!u && typeof window !== 'undefined') {
-          localStorage.removeItem('utsav_has_auth');
-        }
-        callback(u);
-      });
-    } else {
-      callback(null);
-    }
-  });
+  let active = true;
+  void initFirebase()
+    .then(async (authInstance) => {
+      if (authInstance) {
+        const { onAuthStateChanged } = await import('firebase/auth');
+        if (!active) return;
+        unsubscribe = onAuthStateChanged(authInstance, (u) => {
+          if (!u && typeof window !== 'undefined') {
+            localStorage.removeItem('utsav_has_auth');
+          }
+          callback(u);
+        });
+      } else if (active) {
+        callback(null);
+      }
+    })
+    .catch(() => {
+      if (active) callback(null);
+    });
 
   return () => {
+    active = false;
     if (unsubscribe) unsubscribe();
   };
 }

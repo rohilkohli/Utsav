@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PlanOutput, WizardInput } from '@shared/schemas';
 import { getTodayInKolkata } from '@shared/schemas';
-import { localAnswer } from '@shared/advisor';
-import { planInsights, type InsightTab, type PlanInsight } from '@shared/insights';
-import { apiAskPlanner, apiReviewPlan } from '../../lib/api';
+import { planInsights, type InsightTab } from '@shared/insights';
+import { apiReviewPlan } from '../../lib/api';
+import { useAiCall } from '../../hooks/useAiCall';
+import { ThinkingTrace } from '../shared/ThinkingTrace';
+import { AskPlanner } from './AskPlanner';
 
 interface AssistantPanelProps {
   plan: PlanOutput;
@@ -11,29 +13,15 @@ interface AssistantPanelProps {
   onNavigate: (tab: InsightTab) => void;
 }
 
-export const AssistantPanel: React.FC<AssistantPanelProps> = ({ plan, input, onNavigate }) => {
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [review, setReview] = useState<{ strengths: string[]; risks: string[]; suggestions: string[]; overallScore: number; source: string } | null>(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const insights = planInsights(plan, input, getTodayInKolkata());
-
-  const ask = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!question.trim()) return;
-    setAnswer(localAnswer(question, plan, input, getTodayInKolkata()));
-    void apiAskPlanner(question, input, plan)
-      .then((response) => setAnswer(response.answer))
-      .catch(() => undefined);
-  };
-
-  const requestReview = () => {
-    setReviewLoading(true);
-    void apiReviewPlan(input, plan)
-      .then((response) => setReview({ ...response.review, source: response.source }))
-      .catch(() => setAnswer('The built-in planner is available, but the AI review is currently unavailable.'))
-      .finally(() => setReviewLoading(false));
-  };
+export function AssistantPanel({ plan, input, onNavigate }: AssistantPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+  const call = useAiCall<Awaited<ReturnType<typeof apiReviewPlan>>>();
+  const { reset } = call;
+  const today = getTodayInKolkata();
+  const insights = useMemo(() => planInsights(plan, input, today), [plan, input, today]);
+  useEffect(() => {
+    reset();
+  }, [plan, input, reset]);
 
   return (
     <section aria-labelledby="assistant-title" className="assistant-panel">
@@ -45,13 +33,15 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ plan, input, onN
         <span className="assistant-panel__source">Assistant (Built-in Planner)</span>
       </div>
       {insights.length > 0 ? (
-        <div className="assistant-panel__insights" aria-label="Plan insights">
-          {insights.slice(0, 3).map((insight: PlanInsight) => (
+        <div className="assistant-panel__insights" aria-label="Plan insights" id="plan-insights">
+          {(expanded ? insights : insights.slice(0, 3)).map((insight) => (
             <button
               key={insight.id}
               type="button"
               className={`assistant-insight assistant-insight--${insight.severity}`}
-              onClick={() => onNavigate(insight.tab)}
+              onClick={() => {
+                onNavigate(insight.tab);
+              }}
             >
               <strong>{insight.severity}</strong>
               <span>{insight.message}</span>
@@ -62,37 +52,62 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ plan, input, onN
       ) : (
         <p className="assistant-panel__empty">Your plan has no urgent issues today.</p>
       )}
-      <form className="assistant-panel__ask" onSubmit={ask}>
-        <label htmlFor="planner-question">Ask about budget, vendors, timing, or guests</label>
-        <div className="assistant-panel__input-row">
-          <input
-            id="planner-question"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="What should I do next?"
-          />
-          <button type="submit">Ask planner</button>
-        </div>
-      </form>
-      <button type="button" className="assistant-review-button" onClick={requestReview} disabled={reviewLoading}>
-        {reviewLoading ? 'Reviewing plan…' : 'Ask AI for a Plan Review'}
-      </button>
-      {review && (
-        <details className="assistant-review" open>
-          <summary>Plan review · {review.overallScore}/10 · Assistant ({review.source})</summary>
-          <strong>Strengths</strong>
-          <ul>{review.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
-          <strong>Risks</strong>
-          <ul>{review.risks.map((item) => <li key={item}>{item}</li>)}</ul>
-          <strong>Suggestions</strong>
-          <ul>{review.suggestions.map((item) => <li key={item}>{item}</li>)}</ul>
-        </details>
+      {insights.length > 3 && (
+        <button
+          type="button"
+          className="assistant-show-insights"
+          aria-expanded={expanded}
+          aria-controls="plan-insights"
+          onClick={() => {
+            setExpanded((previous) => !previous);
+          }}
+        >
+          {expanded ? 'Show top three insights' : `Show all ${insights.length} insights`}
+        </button>
       )}
-      {answer && (
-        <p className="assistant-panel__answer" role="status">
-          {answer}
+      <AskPlanner plan={plan} input={input} />
+      <button
+        type="button"
+        className="assistant-review-button"
+        onClick={() => {
+          void call.run((options) => apiReviewPlan(input, plan, options));
+        }}
+        disabled={call.running}
+      >
+        {call.running ? 'Reviewing plan…' : 'Ask AI for a Plan Review'}
+      </button>
+      {call.running && (
+        <button type="button" onClick={call.cancel}>
+          Cancel review
+        </button>
+      )}
+      <ThinkingTrace {...call} />
+      {call.error && (
+        <p role="status">
+          Plan review is currently unavailable. Your live plan insights remain available.
         </p>
+      )}
+      {call.result && (
+        <details className="assistant-review" open>
+          <summary>
+            Plan review · {call.result.review.overallScore}/10 · Assistant (
+            {call.result.source === 'gemini' ? 'Gemini' : 'Built-in Planner'})
+          </summary>
+          {(['strengths', 'risks', 'suggestions'] as const).map((section) => (
+            <div key={section}>
+              <h3>
+                {section.charAt(0).toUpperCase()}
+                {section.slice(1)}
+              </h3>
+              <ul>
+                {call.result?.review[section].map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </details>
       )}
     </section>
   );
-};
+}

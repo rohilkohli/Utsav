@@ -1,17 +1,16 @@
 import type { PlanOutput, WizardInput } from './schemas.js';
 import { formatINR } from './currency.js';
 import { buildSchedule, diffInDays } from './timeline.js';
+import { riskFlags } from './quotes.js';
 
 export type InsightSeverity = 'critical' | 'warning' | 'suggestion';
 export type InsightTab = 'budget' | 'timeline' | 'vendors';
-
 export interface PlanInsight {
   id: string;
   severity: InsightSeverity;
   message: string;
   tab: InsightTab;
 }
-
 const severityRank: Record<InsightSeverity, number> = { critical: 0, warning: 1, suggestion: 2 };
 
 export function planInsights(plan: PlanOutput, input: WizardInput, today: string): PlanInsight[] {
@@ -19,48 +18,97 @@ export function planInsights(plan: PlanOutput, input: WizardInput, today: string
   const actual = plan.budget.reduce((sum, category) => sum + category.actual, 0);
   const overBudget = actual - input.totalBudget;
   if (overBudget > 0) {
-    const percentage = input.totalBudget > 0 ? Math.round((overBudget / input.totalBudget) * 100) : 0;
+    const percentage =
+      input.totalBudget > 0
+        ? `${Math.round((overBudget * 100) / input.totalBudget)}%`
+        : 'no budget allocated';
     insights.push({
       id: 'budget-overrun',
       severity: 'critical',
-      message: `Actual spend is ${formatINR(overBudget)} over budget (${percentage}%).`,
+      message: `Actual spend is ${formatINR(overBudget)} over budget (${percentage}).`,
       tab: 'budget',
     });
   }
-
   try {
     const schedule = buildSchedule(plan.timeline, input.eventDate, today);
-    if (schedule.some((milestone) => milestone.flags.impossible || milestone.flags.tooLate)) {
-      insights.push({ id: 'timeline-impossible', severity: 'critical', message: 'One or more tasks cannot finish before the celebration date.', tab: 'timeline' });
+    if (schedule.some((task) => task.flags.impossible || task.flags.tooLate)) {
+      insights.push({
+        id: 'timeline-impossible',
+        severity: 'critical',
+        message: 'One or more tasks cannot finish before the celebration date.',
+        tab: 'timeline',
+      });
     }
-    if (schedule.some((milestone) => milestone.flags.overdue)) {
-      insights.push({ id: 'timeline-overdue', severity: 'warning', message: 'Some timeline tasks are overdue.', tab: 'timeline' });
+    if (schedule.some((task) => task.flags.overdue)) {
+      insights.push({
+        id: 'timeline-overdue',
+        severity: 'warning',
+        message: 'Some timeline tasks are overdue.',
+        tab: 'timeline',
+      });
     }
-    if (schedule.some((milestone) => milestone.flags.atRisk && milestone.delayDays)) {
-      insights.push({ id: 'timeline-delay', severity: 'warning', message: 'A delayed prerequisite has pushed downstream work.', tab: 'timeline' });
+    if (
+      schedule.some(
+        (task) => task.flags.atRisk && (task.pushedBy.length > 0 || (task.delayDays ?? 0) > 0),
+      )
+    ) {
+      insights.push({
+        id: 'timeline-delay',
+        severity: 'warning',
+        message: 'A delayed prerequisite has pushed downstream work.',
+        tab: 'timeline',
+      });
     }
-    const next = schedule.find((milestone) => milestone.effectiveDate >= today && milestone.status !== 'done' && !milestone.completed);
-    if (next) {
+    const next = schedule
+      .filter((task) => task.effectiveDate >= today && task.status !== 'done' && !task.completed)
+      .sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate))[0];
+    if (next)
       insights.push({
         id: 'next-task',
         severity: 'suggestion',
         message: `Next: ${next.title} by ${next.effectiveDate}${next.assignee ? ` (${next.assignee})` : ''}.`,
         tab: 'timeline',
       });
-    }
   } catch {
-    insights.push({ id: 'timeline-invalid', severity: 'critical', message: 'Timeline dependencies need attention before scheduling can continue.', tab: 'timeline' });
+    insights.push({
+      id: 'timeline-invalid',
+      severity: 'critical',
+      message: 'Timeline dependencies need attention before scheduling can continue.',
+      tab: 'timeline',
+    });
   }
-
-  const contingency = plan.budget.find((category) => category.category.toLowerCase().includes('contingency'));
-  if (!contingency || contingency.amount < input.totalBudget * 0.05) {
-    insights.push({ id: 'low-contingency', severity: 'warning', message: 'Keep at least 5% of the budget as a contingency buffer.', tab: 'budget' });
+  const contingency = plan.budget
+    .filter((category) => /contingency/i.test(category.category))
+    .reduce((sum, category) => sum + category.amount, 0);
+  if (contingency < input.totalBudget * 0.05) {
+    insights.push({
+      id: 'low-contingency',
+      severity: 'warning',
+      message: 'Keep at least 5% of the budget as a contingency buffer.',
+      tab: 'budget',
+    });
   }
+  const daysToEvent = diffInDays(today, input.eventDate);
   for (const vendor of plan.vendors) {
-    if (vendor.status !== 'booked' && diffInDays(today, vendor.bookByDate) <= 60 && diffInDays(today, vendor.bookByDate) >= 0) {
-      insights.push({ id: `vendor-${vendor.id}`, severity: 'warning', message: `${vendor.category} should be confirmed within the next 60 days.`, tab: 'vendors' });
+    const quote = vendor.quotes?.find((entry) => entry.id === vendor.acceptedQuoteId);
+    const risks = quote
+      ? riskFlags({ ...quote, budgetedAmount: vendor.budgetedAmount }, input.guestCount)
+      : [];
+    if (risks.length > 0)
+      insights.push({
+        id: `quote-${vendor.id}`,
+        severity: 'warning',
+        message: `${vendor.category}: accepted quote needs attention (${risks.join(', ')}).`,
+        tab: 'vendors',
+      });
+    if (vendor.status !== 'booked' && (daysToEvent <= 60 || vendor.bookByDate <= today)) {
+      insights.push({
+        id: `vendor-${vendor.id}`,
+        severity: 'warning',
+        message: `${vendor.category} still needs confirmation${vendor.bookByDate < today ? ' (booking deadline passed)' : ' before the celebration'}.`,
+        tab: 'vendors',
+      });
     }
   }
-
   return insights.sort((left, right) => severityRank[left.severity] - severityRank[right.severity]);
 }

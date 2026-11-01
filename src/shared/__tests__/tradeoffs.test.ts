@@ -35,7 +35,7 @@ describe('suggestTradeoffs', () => {
     const options = suggestTradeoffs(BASE_CATEGORIES, TOTAL, OVER_BY);
     const uniformCut = options.find((o) => o.id === 'uniform-cut');
     expect(uniformCut).toBeDefined();
-    expect(uniformCut!.newTotal).toBeLessThan(TOTAL);
+    expect(uniformCut?.newTotal).toBeLessThan(TOTAL);
   });
 
   it('flex-cut option targets decoration/photography/return gifts', () => {
@@ -43,8 +43,8 @@ describe('suggestTradeoffs', () => {
     const flexCut = options.find((o) => o.id === 'flex-cut');
     expect(flexCut).toBeDefined();
     // Catering (essential) should not be cut
-    const cateringBefore = BASE_CATEGORIES.find((c) => c.id === '1')!.actual;
-    const cateringAfter = flexCut!.updatedCategories.find((c) => c.id === '1')!.actual;
+    const cateringBefore = BASE_CATEGORIES.find((c) => c.id === '1')?.actual;
+    const cateringAfter = flexCut?.updatedCategories.find((c) => c.id === '1')?.actual;
     expect(cateringAfter).toBe(cateringBefore);
   });
 
@@ -53,8 +53,8 @@ describe('suggestTradeoffs', () => {
     // Third option is either 'rebalance' (when under-spent cats exist) or 'smart-cut' fallback
     const thirdOpt = options[2];
     expect(thirdOpt).toBeDefined();
-    expect(thirdOpt.updatedCategories).toHaveLength(BASE_CATEGORIES.length);
-    expect(thirdOpt.savings).toBeGreaterThan(0);
+    expect(thirdOpt?.updatedCategories).toHaveLength(BASE_CATEGORIES.length);
+    expect(thirdOpt?.savings).toBeGreaterThan(0);
   });
 
   it('rebalance option appears when both over-spent and under-spent categories exist', () => {
@@ -66,7 +66,7 @@ describe('suggestTradeoffs', () => {
     const opts = suggestTradeoffs(mixedCats, 500_000, 20_000);
     const rebalance = opts.find((o) => o.id === 'rebalance');
     expect(rebalance).toBeDefined();
-    expect(rebalance!.updatedCategories).toHaveLength(3);
+    expect(rebalance?.updatedCategories).toHaveLength(3);
   });
 
   it('each option has an id, label, description and updatedCategories', () => {

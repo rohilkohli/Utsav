@@ -1,3 +1,4 @@
+import { requireValue } from './invariants.js';
 import { addDaysToDateOnly } from './timeline.js';
 
 export interface CalendarEvent {
@@ -16,7 +17,7 @@ export function foldLine(line: string): string[] {
   const encoder = new TextEncoder();
   for (const character of line) {
     const size = encoder.encode(character).length;
-    const limit = chunks.length === 0 ? 75 : 74;
+    const limit = 75;
     if (chunk && octets + size > limit) {
       chunks.push(chunk);
       chunk = ' ';
@@ -48,11 +49,18 @@ function toICSDate(dateStr: string): string {
   return dateStr.replace(/-/g, '');
 }
 
+function stableId(value: string): string {
+  let hash = 2166136261;
+  for (const character of value)
+    hash = Math.imul(hash ^ requireValue(character.codePointAt(0)), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
 /**
  * Generates an RFC 5545 compliant .ics file content string with CRLF endings.
  */
-export function generateICS(events: CalendarEvent[]): string {
-  const now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+export function generateICS(events: CalendarEvent[], timestamp = '2000-01-01T00:00:00Z'): string {
+  const now = timestamp.replace(/[-:]/g, '').slice(0, 15) + 'Z';
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -62,9 +70,8 @@ export function generateICS(events: CalendarEvent[]): string {
     'METHOD:PUBLISH',
   ];
 
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i]!;
-    const uid = `utsav-${i}-${toICSDate(e.dateStr)}-${Math.random().toString(36).slice(2, 8)}@utsav.app`;
+  for (const [i, e] of events.entries()) {
+    const uid = `utsav-${i}-${toICSDate(e.dateStr)}-${stableId(e.title + e.description)}@utsav.app`;
     const eventDate = e.effectiveDate ?? e.dateStr;
     const startDate = toICSDate(eventDate);
     // All-day events in RFC 5545 specify DTEND as the next day (exclusive)

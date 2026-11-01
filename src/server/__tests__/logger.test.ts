@@ -46,7 +46,7 @@ describe('Logger utility', () => {
       const { logger } = await import('../lib/logger.js');
       logger.info('server started on port 8080');
       expect(writeSpy).toHaveBeenCalledOnce();
-      const output = String(writeSpy.mock.calls[0][0]);
+      const output = String(writeSpy.mock.calls[0]?.[0]);
       expect(output).toContain('INFO');
       expect(output).toContain('server started on port 8080');
     });
@@ -58,7 +58,7 @@ describe('Logger utility', () => {
       const { logger } = await import('../lib/logger.js');
       logger.warn('falling back to in-memory store');
       expect(writeSpy).toHaveBeenCalledOnce();
-      const output = String(writeSpy.mock.calls[0][0]);
+      const output = String(writeSpy.mock.calls[0]?.[0]);
       expect(output).toContain('WARN');
       expect(output).toContain('falling back to in-memory store');
     });
@@ -70,7 +70,7 @@ describe('Logger utility', () => {
       const { logger } = await import('../lib/logger.js');
       logger.error('unhandled exception');
       expect(writeSpy).toHaveBeenCalledOnce();
-      const output = String(writeSpy.mock.calls[0][0]);
+      const output = String(writeSpy.mock.calls[0]?.[0]);
       expect(output).toContain('ERROR');
       expect(output).toContain('unhandled exception');
     });
@@ -81,7 +81,7 @@ describe('Logger utility', () => {
       const writeSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
       const { logger } = await import('../lib/logger.js');
       logger.info('timestamp check');
-      const output = String(writeSpy.mock.calls[0][0]);
+      const output = String(writeSpy.mock.calls[0]?.[0]);
       expect(output).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
     });
 
@@ -91,7 +91,7 @@ describe('Logger utility', () => {
       const writeSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
       const { logger } = await import('../lib/logger.js');
       logger.info('newline check');
-      const output = String(writeSpy.mock.calls[0][0]);
+      const output = String(writeSpy.mock.calls[0]?.[0]);
       expect(output).toMatch(/\n$/);
     });
   });

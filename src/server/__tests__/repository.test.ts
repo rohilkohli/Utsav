@@ -7,6 +7,7 @@ import {
   FirestoreRepository,
 } from '../repositories/index.js';
 import type { SavedPlan, WizardInput, PlanOutput } from '../../shared/schemas.js';
+import { z } from 'zod';
 
 describe('Repository Pattern & Storage Backends', () => {
   const originalEnv = { ...process.env };
@@ -77,7 +78,17 @@ describe('Repository Pattern & Storage Backends', () => {
 
     const samplePlan: PlanOutput = {
       summary: 'Retro Disco Birthday',
-      budget: [{ id: '1', category: 'Music', suggestedPercent: 100, amount: 20000, actual: 20000, locked: false, verified: false }],
+      budget: [
+        {
+          id: '1',
+          category: 'Music',
+          suggestedPercent: 100,
+          amount: 20000,
+          actual: 20000,
+          locked: false,
+          verified: false,
+        },
+      ],
       timeline: [],
       vendors: [],
       ideas: [],
@@ -155,7 +166,9 @@ describe('Repository Pattern & Storage Backends', () => {
     it('creates share with real Firestore Timestamp and verifies TTL expiry check', async () => {
       const firestoreRepo = new FirestoreRepository();
 
-      const mockCollectionSet = vi.fn().mockResolvedValue(undefined);
+      const mockCollectionSet = vi
+        .fn<(data: unknown, options?: { merge: boolean }) => Promise<void>>()
+        .mockResolvedValue(undefined);
       const mockDocGet = vi.fn();
       const mockDoc = vi.fn((_docId: string) => ({
         set: mockCollectionSet,
@@ -210,7 +223,9 @@ describe('Repository Pattern & Storage Backends', () => {
       const shareResult = await firestoreRepo.createShare(sampleInput, samplePlan);
       expect(mockCollection).toHaveBeenCalledWith('shares');
       expect(mockDoc).toHaveBeenCalledWith(shareResult.shareToken);
-      const setCallArgs = mockCollectionSet.mock.calls[1][0];
+      const setCallArgs = z
+        .object({ expiresAt: z.instanceof(admin.firestore.Timestamp) })
+        .parse(mockCollectionSet.mock.calls[1]?.[0]);
       expect(setCallArgs.expiresAt).toBeInstanceOf(admin.firestore.Timestamp);
       expect(typeof shareResult.expiresAt).toBe('string');
 
@@ -254,7 +269,8 @@ describe('Repository Pattern & Storage Backends', () => {
       expect(activeDoc).not.toBeNull();
       expect(activeDoc?.shareToken).toBe('token_active');
       expect(typeof activeDoc?.expiresAt).toBe('string');
-      expect(new Date(activeDoc!.expiresAt!).getTime()).toBeGreaterThan(Date.now());
+      if (!activeDoc?.expiresAt) throw new Error('Expected an active snapshot expiry');
+      expect(new Date(activeDoc.expiresAt).getTime()).toBeGreaterThan(Date.now());
 
       // 6. Test getShare fails closed when expiresAt is missing
       mockDocGet.mockResolvedValueOnce({

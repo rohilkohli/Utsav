@@ -1,35 +1,34 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { createPlan, noOverflow, openTab, tabs } from './helpers';
 
-/**
- * E2E accessibility tests for Utsav.
- * Validates ARIA landmarks, skip links, and keyboard navigation
- * are present and functional on the landing page.
- */
-test.describe('Accessibility', () => {
-  test('has a skip-to-main link', async ({ page }) => {
+for (const theme of ['light', 'dark']) {
+  test(`${theme} wizard and all dashboard tabs meet WCAG AA without CSP errors or overflow`, async ({ page }) => {
+    test.setTimeout(120000);
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.addInitScript(value => { localStorage.setItem('utsav-theme', value); }, theme);
     await page.goto('/');
-    const skipLink = page.getByRole('link', { name: /skip to main/i });
-    // May be visually hidden but must be in the DOM for keyboard users
-    await expect(skipLink).toBeAttached();
+    // Use the product toggle so the test also validates theme persistence.
+    const current = await page.locator('html').getAttribute('data-theme');
+    if (current !== theme) await page.getByRole('button', { name: `Switch to ${theme} theme` }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    const audit = async () => {
+      await noOverflow(page);
+      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+      expect(results.violations).toEqual([]);
+    };
+    await audit();
+    await createPlan(page);
+    for (const tab of tabs) { await openTab(page, tab); await audit(); }
+    await page.getByRole('tab', { name: 'Budget Planner', exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: 'Timeline & Milestones', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: /Share Plan/ }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: /Share Plan/ })).toBeFocused();
+    expect(errors).toEqual([]);
   });
-
-  test('main landmark is present', async ({ page }) => {
-    await page.goto('/');
-    const main = page.getByRole('main');
-    await expect(main).toBeAttached();
-  });
-
-  test('navigation landmark is present', async ({ page }) => {
-    await page.goto('/');
-    const nav = page.getByRole('navigation');
-    await expect(nav).toBeAttached();
-  });
-
-  test('primary CTA is keyboard-focusable', async ({ page }) => {
-    await page.goto('/');
-    await page.keyboard.press('Tab');
-    // After one or two tabs we should reach an interactive element
-    const focused = await page.evaluate(() => document.activeElement?.tagName);
-    expect(['A', 'BUTTON', 'INPUT']).toContain(focused);
-  });
-});
+}

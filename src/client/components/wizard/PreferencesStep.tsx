@@ -1,7 +1,10 @@
+import './PreferencesStep.css';
 import React from 'react';
+import type { FieldErrors } from './useWizardForm';
 import type { OutputLanguage } from '@shared/schemas';
 
 interface PreferencesStepProps {
+  errors?: FieldErrors;
   theme: string;
   dietaryPreferences: string[];
   culturalNotes: string;
@@ -30,51 +33,43 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
   onToggleDietary,
   onChangeCulturalNotes,
   onChangeLanguage,
+  errors = {},
 }) => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div className={['preferences-step-div-1'].join(' ')}>
       <div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-          Personalize your celebration vibe
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+        <h2 className={['preferences-step-h2-2'].join(' ')}>Personalize your celebration vibe</h2>
+        <p className={['preferences-step-p-3'].join(' ')}>
           Add themes, dietary traditions, and choose your preferred planning language.
         </p>
       </div>
 
       {/* Language */}
       <div>
-        <label
-          id="language-selection-label"
-          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
-        >
+        <p id="language-selection-label" className={['preferences-step-label-4'].join(' ')}>
           Plan Output Language:
-        </label>
+        </p>
         <div
           role="radiogroup"
           aria-labelledby="language-selection-label"
-          style={{ display: 'flex', gap: '0.75rem' }}
+          className={['preferences-step-div-5'].join(' ')}
         >
           <button
             type="button"
             role="radio"
             aria-checked={language === 'english'}
-            onClick={() => onChangeLanguage('english')}
-            style={{
-              flex: 1,
-              maxWidth: '180px',
-              padding: '0.75rem',
-              borderRadius: 'var(--radius-md)',
-              border:
-                language === 'english'
-                  ? '2px solid var(--primary-saffron)'
-                  : '1px solid var(--surface-border)',
-              background:
-                language === 'english' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
-              color: 'var(--text-main)',
-              fontWeight: 600,
-              cursor: 'pointer',
+            onClick={() => {
+              onChangeLanguage('english');
             }}
+            className={[
+              'preferences-step-button-6',
+              language === 'english'
+                ? 'preferences-step-button-6-border-yes'
+                : 'preferences-step-button-6-border-no',
+              language === 'english'
+                ? 'preferences-step-button-6-background-yes'
+                : 'preferences-step-button-6-background-no',
+            ].join(' ')}
           >
             🇬🇧 English
           </button>
@@ -82,22 +77,18 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
             type="button"
             role="radio"
             aria-checked={language === 'hindi'}
-            onClick={() => onChangeLanguage('hindi')}
-            style={{
-              flex: 1,
-              maxWidth: '180px',
-              padding: '0.75rem',
-              borderRadius: 'var(--radius-md)',
-              border:
-                language === 'hindi'
-                  ? '2px solid var(--primary-saffron)'
-                  : '1px solid var(--surface-border)',
-              background:
-                language === 'hindi' ? 'var(--surface-card-hover)' : 'var(--surface-card)',
-              color: 'var(--text-main)',
-              fontWeight: 600,
-              cursor: 'pointer',
+            onClick={() => {
+              onChangeLanguage('hindi');
             }}
+            className={[
+              'preferences-step-button-7',
+              language === 'hindi'
+                ? 'preferences-step-button-7-border-yes'
+                : 'preferences-step-button-7-border-no',
+              language === 'hindi'
+                ? 'preferences-step-button-7-background-yes'
+                : 'preferences-step-button-7-background-no',
+            ].join(' ')}
           >
             🇮🇳 हिंदी (Hindi)
           </button>
@@ -106,40 +97,35 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
 
       {/* Theme */}
       <div>
-        <label
-          htmlFor="theme-input"
-          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
-        >
+        <label htmlFor="theme-input" className={['preferences-step-label-8'].join(' ')}>
           Theme / Aesthetic Vibe:
         </label>
         <input
           id="theme-input"
+          maxLength={300}
+          aria-invalid={Boolean(errors.theme)}
+          aria-describedby={errors.theme ? 'theme-error' : undefined}
           type="text"
           placeholder="e.g. Royal Marigold & Sunset Tones, Pastel Floral, Desi Bollywood, Eco-Friendly"
           value={theme}
-          onChange={(e) => onChangeTheme(e.target.value)}
-          style={{
-            width: '100%',
-            maxWidth: '500px',
-            padding: '0.75rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--surface-border)',
-            background: 'var(--surface-card)',
-            color: 'var(--text-main)',
-            fontSize: '1rem',
+          onChange={(e) => {
+            onChangeTheme(e.target.value);
           }}
+          className={['preferences-step-input-9'].join(' ')}
         />
       </div>
 
+      {errors.theme && (
+        <p id="theme-error" className="wizard-field-error">
+          {errors.theme}
+        </p>
+      )}
       {/* Dietary */}
       <div>
-        <label
-          id="dietary-preferences-label"
-          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
-        >
+        <p id="dietary-preferences-label" className={['preferences-step-label-10'].join(' ')}>
           Dietary & Catering Preferences:
-        </label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        </p>
+        <div className={['preferences-step-div-11'].join(' ')}>
           {DIETARY_OPTIONS.map((item) => {
             const active = dietaryPreferences.includes(item);
             return (
@@ -147,20 +133,21 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
                 key={item}
                 type="button"
                 aria-pressed={active}
-                onClick={() => onToggleDietary(item)}
-                style={{
-                  padding: '0.45rem 0.85rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  borderRadius: 'var(--radius-full)',
-                  border: active
-                    ? '1px solid var(--primary-emerald)'
-                    : '1px solid var(--surface-border)',
-                  background: active ? 'var(--primary-emerald)' : 'var(--surface-card)',
-                  color: active ? '#ffffff' : 'var(--text-main)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                onClick={() => {
+                  onToggleDietary(item);
                 }}
+                className={[
+                  'preferences-step-button-12',
+                  active
+                    ? 'preferences-step-button-12-border-yes'
+                    : 'preferences-step-button-12-border-no',
+                  active
+                    ? 'preferences-step-button-12-background-yes'
+                    : 'preferences-step-button-12-background-no',
+                  active
+                    ? 'preferences-step-button-12-color-yes'
+                    : 'preferences-step-button-12-color-no',
+                ].join(' ')}
               >
                 {active ? '✓ ' : '+ '}
                 {item}
@@ -172,31 +159,28 @@ export const PreferencesStep: React.FC<PreferencesStepProps> = ({
 
       {/* Cultural Notes */}
       <div>
-        <label
-          htmlFor="cultural-notes"
-          style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.95rem' }}
-        >
+        <label htmlFor="cultural-notes" className={['preferences-step-label-13'].join(' ')}>
           Cultural Traditions & Custom Notes (Optional):
         </label>
         <textarea
           id="cultural-notes"
+          maxLength={500}
+          aria-invalid={Boolean(errors.culturalNotes)}
+          aria-describedby={errors.culturalNotes ? 'cultural-notes-error' : undefined}
           rows={3}
           placeholder="e.g. Traditional South Indian Muhurtham at dawn, Punjabi Baraat with Dhol, Sindhi Santh rituals, etc."
           value={culturalNotes}
-          onChange={(e) => onChangeCulturalNotes(e.target.value)}
-          style={{
-            width: '100%',
-            maxWidth: '600px',
-            padding: '0.75rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--surface-border)',
-            background: 'var(--surface-card)',
-            color: 'var(--text-main)',
-            fontSize: '0.95rem',
-            resize: 'vertical',
+          onChange={(e) => {
+            onChangeCulturalNotes(e.target.value);
           }}
+          className={['preferences-step-textarea-14'].join(' ')}
         />
       </div>
+      {errors.culturalNotes && (
+        <p id="cultural-notes-error" className="wizard-field-error">
+          {errors.culturalNotes}
+        </p>
+      )}
     </div>
   );
 };

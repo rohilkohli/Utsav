@@ -16,7 +16,9 @@ describe('Budget Math - Deterministic Allocation', () => {
     ]);
     expect(categories.at(-1)?.category).toBe('Contingency Buffer');
     expect(categories.at(-1)?.suggestedPercent).toBe(10);
-    expect(categories.slice(0, -1).reduce((sum, category) => sum + category.suggestedPercent, 0)).toBe(90);
+    expect(
+      categories.slice(0, -1).reduce((sum, category) => sum + category.suggestedPercent, 0),
+    ).toBe(90);
   });
 
   it('allocates amounts such that sum equals EXACTLY the total budget (Largest-Remainder)', () => {
@@ -68,9 +70,9 @@ describe('Budget Math - Deterministic Allocation', () => {
     ];
     const result = populateCategoryAmounts(categories, 200_000);
     expect(result.length).toBe(2);
-    expect(result[0].amount).toBe(100_000);
-    expect(result[0].actual).toBe(100_000);
-    expect(result[0].subEvent).toBe('Haldi');
+    expect(result[0]?.amount).toBe(100_000);
+    expect(result[0]?.actual).toBe(100_000);
+    expect(result[0]?.subEvent).toBe('Haldi');
   });
 
   it('calculates totals and over-budget status accurately', () => {
@@ -130,7 +132,9 @@ describe('Budget Math - Deterministic Allocation', () => {
     const amounts = allocateAmountsByLargestRemainder(items, budget);
     const sum = amounts.reduce((a, b) => a + b, 0);
     expect(sum).toBe(budget);
-    amounts.forEach((a) => expect(Number.isInteger(a)).toBe(true));
+    amounts.forEach((a) => {
+      expect(Number.isInteger(a)).toBe(true);
+    });
   });
 
   it('applyBudgetCut preserves integer amounts after cut', () => {
@@ -139,13 +143,13 @@ describe('Budget Math - Deterministic Allocation', () => {
       { id: '2', category: 'Catering', suggestedPercent: 40, amount: 40_000, actual: 40_000 },
     ];
     const { updatedCategories } = applyBudgetCut(categories, 100_000, 15);
-    updatedCategories.forEach((c) => expect(Number.isInteger(c.amount)).toBe(true));
+    updatedCategories.forEach((c) => {
+      expect(Number.isInteger(c.amount)).toBe(true);
+    });
   });
 
   it('calculateBudgetTotals with zero actuals reports zero actual and under-budget', () => {
-    const cats = [
-      { id: '1', category: 'X', suggestedPercent: 100, amount: 50_000, actual: 0 },
-    ];
+    const cats = [{ id: '1', category: 'X', suggestedPercent: 100, amount: 50_000, actual: 0 }];
     const totals = calculateBudgetTotals(cats, 50_000);
     expect(totals.totalActual).toBe(0);
     expect(totals.isOverBudget).toBe(false);
@@ -173,8 +177,8 @@ describe('Budget Math - Deterministic Allocation', () => {
       { id: '3', category: 'Priest Dakshina', suggestedPercent: 30, amount: 30, actual: 30 },
     ];
     const grouped = groupCategoriesBySubEvent(categories);
-    expect(grouped['Haldi']?.length).toBe(1);
-    expect(grouped['Sangeet']?.length).toBe(1);
-    expect(grouped['General']?.length).toBe(1);
+    expect(grouped.Haldi?.length).toBe(1);
+    expect(grouped.Sangeet?.length).toBe(1);
+    expect(grouped.General?.length).toBe(1);
   });
 });

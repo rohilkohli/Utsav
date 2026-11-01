@@ -1,86 +1,147 @@
-import React, { useMemo, useState } from 'react';
-import { formatINR, parseINR } from '@shared/currency';
-import { inquiryDraft, missingFields, riskFlags, type VendorQuote } from '@shared/quotes';
-
+import { useState } from 'react';
+import type { VendorQuote } from '@shared/quotes';
+import { effectiveCost, inquiryDraft, missingFields, riskFlags } from '@shared/quotes';
+import { formatINR } from '@shared/currency';
+import { apiExtractQuote } from '../../lib/api';
+import { useAiCall } from '../../hooks/useAiCall';
+import { ThinkingTrace } from '../shared/ThinkingTrace';
 interface QuoteAnalyzerProps {
   vendorId: string;
   vendorName: string;
   category: string;
   budgetedAmount: number;
-  onAccept: (amount: number) => void;
+  guestCount: number;
+  quoteCount: number;
+  onAddQuote: (quote: VendorQuote) => void;
 }
-
-interface ExtractedQuote {
-  amount: number;
-  pricePerPlate?: number;
-  guestMinimum?: number;
-  advancePercent?: number;
-  taxIncluded?: boolean;
-  cancellationPolicy?: string;
-  overtimeFee?: string;
-}
-
-function extractQuote(text: string): ExtractedQuote | null {
-  const amounts = [...text.matchAll(/(?:₹|rs\.?\s*)?([\d,]+(?:\.\d+)?)\s*(lakh|lac|crore|cr|k)?/gi)]
-    .map((match) => parseINR(`${match[1]}${match[2] ?? ''}`))
-    .filter((amount): amount is number => amount !== null);
-  if (amounts.length === 0) return null;
-  const perPlateMatch = text.match(/(?:per\s*plate|plate)[^\d₹]{0,8}(?:₹|rs\.?\s*)?([\d,]+)/i);
-  const minimumMatch = text.match(/(?:minimum|min)\s*(?:of\s*)?(\d[\d,]*)\s*(?:plates|guests)?/i);
-  const advanceMatch = text.match(/advance[^\d]*(\d{1,3})\s*%/i);
-  const cancellation = text.match(/(cancell?ation[^.\n]*)/i)?.[1];
-  const overtime = text.match(/(overtime[^.\n]*)/i)?.[1];
-  return {
-    amount: amounts[0] ?? 0,
-    ...(perPlateMatch?.[1] ? { pricePerPlate: parseINR(perPlateMatch[1]) ?? undefined } : {}),
-    ...(minimumMatch?.[1] ? { guestMinimum: Number(minimumMatch[1].replace(/,/g, '')) } : {}),
-    ...(advanceMatch?.[1] ? { advancePercent: Number(advanceMatch[1]) } : {}),
-    ...(cancellation ? { cancellationPolicy: cancellation } : {}),
-    ...(overtime ? { overtimeFee: overtime } : {}),
-    ...(text.match(/gst|tax\s*included|inclusive/i) ? { taxIncluded: true } : {}),
-  };
-}
-
-export const QuoteAnalyzer: React.FC<QuoteAnalyzerProps> = ({
+export const QuoteAnalyzer = ({
   vendorId,
   vendorName,
   category,
   budgetedAmount,
-  onAccept,
-}) => {
+  guestCount,
+  quoteCount,
+  onAddQuote,
+}: QuoteAnalyzerProps) => {
   const [text, setText] = useState('');
-  const extracted = useMemo(() => extractQuote(text), [text]);
-  if (!extracted) {
-    return (
-      <details className="quote-analyzer">
-        <summary>Analyze WhatsApp or email quote</summary>
-        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder="Paste the vendor quote here..." rows={4} />
-        <p className="quote-analyzer__hint">Include the total, per-plate amount, GST, advance, minimum plates, and cancellation terms when available.</p>
-      </details>
-    );
-  }
-
-  const quote: VendorQuote = {
-    id: `${vendorId}-quote`,
-    vendorId,
-    vendorName,
-    category,
-    quotedAmount: extracted.amount,
-    budgetedAmount,
-    notes: text.slice(0, 500),
-    receivedAt: new Date().toISOString(),
-    ...extracted,
-  };
-  const risks = riskFlags(quote, extracted.guestMinimum ?? 0);
+  const [feedback, setFeedback] = useState('');
+  const call = useAiCall<Awaited<ReturnType<typeof apiExtractQuote>>>();
+  const extracted = call.result?.quote;
+  const quote: VendorQuote | null = extracted
+    ? {
+        ...extracted,
+        id: `${vendorId}-preview`,
+        vendorId,
+        vendorName: extracted.vendorName ?? vendorName,
+        category,
+        quotedAmount: extracted.totalPrice ?? 0,
+        budgetedAmount,
+        notes: text.slice(0, 500),
+        receivedAt: new Date().toISOString(),
+      }
+    : null;
   return (
-    <details className="quote-analyzer" open>
-      <summary>Quote analysis</summary>
-      <textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} />
-      <p><strong>Detected:</strong> {formatINR(extracted.amount)}{extracted.pricePerPlate ? ` · ${formatINR(extracted.pricePerPlate)} per plate` : ''}</p>
-      <p><strong>Missing:</strong> {missingFields(quote).join(', ') || 'Nothing obvious'}</p>
-      {risks.length > 0 && <p className="quote-analyzer__risks"><strong>Flags:</strong> {risks.join(', ')}</p>}
-      <p className="quote-analyzer__draft">{inquiryDraft(quote, {})}</p>
-      <button type="button" onClick={() => onAccept(extracted.amount)}>Accept quotation</button>
+    <details className="dashboard-card">
+      <summary>Analyze WhatsApp or email quote</summary>
+      <label className="dashboard-label">
+        Quote text for {category}
+        <textarea
+          className="dashboard-input dashboard-refine"
+          value={text}
+          maxLength={8000}
+          onChange={(event) => {
+            setText(event.target.value);
+            call.reset();
+            setFeedback('');
+          }}
+          placeholder="Paste the vendor quotation with prices and terms"
+          rows={4}
+        />
+      </label>
+      <button
+        type="button"
+        className="dashboard-button"
+        disabled={!text.trim() || call.running || quoteCount >= 3}
+        onClick={() => {
+          void call.run((options) => apiExtractQuote(text, category, options));
+        }}
+      >
+        Analyze quote
+      </button>
+      {quoteCount >= 3 && <p>Three quotes are already saved. Remove one before adding another.</p>}
+      <ThinkingTrace {...call} />
+      {call.error && <p role="alert">{call.error}</p>}
+      {quote && (
+        <div className="dashboard-stack">
+          <p>
+            <strong>Effective total:</strong> {formatINR(effectiveCost(quote, guestCount))} ·{' '}
+            {call.result?.source === 'gemini'
+              ? 'Assistant (Gemini)'
+              : 'Assistant (Built-in Planner)'}
+          </p>
+          <dl>
+            <dt>Total price</dt>
+            <dd>
+              {extracted?.totalPrice === null ? 'Not stated' : formatINR(quote.totalPrice ?? 0)}
+            </dd>
+            <dt>Per plate</dt>
+            <dd>{quote.pricePerPlate == null ? 'Not stated' : formatINR(quote.pricePerPlate)}</dd>
+            <dt>Minimum guests</dt>
+            <dd>{quote.guestMinimum ?? 'Not stated'}</dd>
+            <dt>Taxes included</dt>
+            <dd>{quote.taxIncluded == null ? 'Not stated' : quote.taxIncluded ? 'Yes' : 'No'}</dd>
+            <dt>Advance</dt>
+            <dd>{quote.advancePercent == null ? 'Not stated' : `${quote.advancePercent}%`}</dd>
+            <dt>Cancellation</dt>
+            <dd>{quote.cancellationPolicy ?? 'Not stated'}</dd>
+          </dl>
+          <p>
+            <strong>Missing:</strong> {missingFields(quote).join(', ') || 'No missing terms'}
+          </p>
+          <p>
+            <strong>Flags:</strong> {riskFlags(quote, guestCount).join(', ') || 'No flags'}
+          </p>
+          <p>{inquiryDraft(quote, {})}</p>
+          <div className="dashboard-row">
+            <button
+              type="button"
+              className="dashboard-button"
+              onClick={() => {
+                void navigator.clipboard.writeText(inquiryDraft(quote, {})).then(
+                  () => {
+                    setFeedback('Follow-up copied.');
+                  },
+                  () => {
+                    setFeedback('Copy unavailable. Select the message above to copy it.');
+                  },
+                );
+              }}
+            >
+              Copy follow-up
+            </button>
+            <button
+              type="button"
+              className="dashboard-button dashboard-button--primary"
+              disabled={
+                quoteCount >= 3 || (quote.totalPrice == null && quote.pricePerPlate == null)
+              }
+              onClick={() => {
+                onAddQuote({
+                  ...quote,
+                  id: crypto.randomUUID(),
+                  quotedAmount: effectiveCost(quote, guestCount),
+                });
+                call.reset();
+                setText('');
+                setFeedback('Quotation added for comparison.');
+              }}
+            >
+              Add to comparison
+            </button>
+          </div>
+        </div>
+      )}
+      <p role="status">{feedback}</p>
     </details>
   );
 };

@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { getTodayInKolkata, parseIntakeRequestSchema } from '../../shared/schemas.js';
-import { parseEventDescription } from '../../shared/intake.js';
+import { parseIntake } from '../services/intakeService.js';
+import { runAiResponse } from './aiResponse.js';
 import { validateBody } from '../middleware/validate.js';
 import { generationLimiter } from '../middleware/rateLimit.js';
 
@@ -11,9 +12,11 @@ router.post(
   generationLimiter,
   express.json({ limit: '16kb' }),
   validateBody(parseIntakeRequestSchema),
-  (req, res) => {
-    const input = parseEventDescription(req.body.description, getTodayInKolkata());
-    res.status(200).json({ input, source: 'fallback' });
+  async (req, res) => {
+    const body = parseIntakeRequestSchema.parse(req.body);
+    await runAiResponse(req, res, (context) =>
+      parseIntake(body.description, getTodayInKolkata(), context),
+    );
   },
 );
 

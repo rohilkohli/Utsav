@@ -20,10 +20,36 @@ const plan: PlanOutput = {
   summary: 'A plan',
   budget: [
     { id: 'food', category: 'Food', suggestedPercent: 90, amount: 90000, actual: 120000 },
-    { id: 'contingency-buffer', category: 'Contingency Buffer', suggestedPercent: 10, amount: 10000, actual: 10000 },
+    {
+      id: 'contingency-buffer',
+      category: 'Contingency Buffer',
+      suggestedPercent: 10,
+      amount: 10000,
+      actual: 10000,
+    },
   ],
-  timeline: [{ id: 'cake', title: 'Order cake', description: 'Order', daysBeforeEvent: 7, date: '2026-11-24', completed: false }],
-  vendors: [{ id: 'caterer', category: 'Caterer', questionsToAsk: ['Rate?'], bookByDaysBeforeEvent: 30, bookByDate: '2026-11-20', status: 'to-contact', quotedAmount: 0, budgetedAmount: 10000 }],
+  timeline: [
+    {
+      id: 'cake',
+      title: 'Order cake',
+      description: 'Order',
+      daysBeforeEvent: 7,
+      date: '2026-11-24',
+      completed: false,
+    },
+  ],
+  vendors: [
+    {
+      id: 'caterer',
+      category: 'Caterer',
+      questionsToAsk: ['Rate?'],
+      bookByDaysBeforeEvent: 30,
+      bookByDate: '2026-11-20',
+      status: 'to-contact',
+      quotedAmount: 0,
+      budgetedAmount: 10000,
+    },
+  ],
   ideas: [],
 };
 

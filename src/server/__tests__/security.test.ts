@@ -2,19 +2,22 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server } from 'http';
 import { createApp } from '../index.js';
 import { setTokenVerifier } from '../middleware/auth.js';
+import { z } from 'zod';
 
 describe('Security Headers & Rate Limiting', () => {
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    setTokenVerifier(async (token: string) => {
-      if (token.startsWith('test-token-')) {
-        const uid = token.replace('test-token-', '').trim();
-        if (uid.length > 0) return { uid, email: `${uid}@test.local` };
-      }
-      return null;
-    });
+    setTokenVerifier((token: string) =>
+      Promise.resolve().then(() => {
+        if (token.startsWith('test-token-')) {
+          const uid = token.replace('test-token-', '').trim();
+          if (uid.length > 0) return { uid, email: `${uid}@test.local` };
+        }
+        return null;
+      }),
+    );
 
     const app = createApp();
     await new Promise<void>((resolve) => {
@@ -30,7 +33,9 @@ describe('Security Headers & Rate Limiting', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+      server.close(() => {
+        resolve();
+      });
     });
   });
 
@@ -90,7 +95,7 @@ describe('Security Headers & Rate Limiting', () => {
       try {
         const res = await fetch(`${baseUrl}/api/voice/session`);
         expect(res.status).toBe(410);
-        const body = await res.json();
+        const body: unknown = await res.json();
         expect(JSON.stringify(body)).not.toContain('test-api-key-12345');
       } finally {
         if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
@@ -116,7 +121,7 @@ describe('Security Headers & Rate Limiting', () => {
         body: JSON.stringify({ input: {} }),
       });
       expect(res.status).toBe(400);
-      const body = await res.json();
+      const body = z.object({ error: z.string() }).parse((await res.json()) as unknown);
       expect(body.error).toBeTruthy();
     });
 

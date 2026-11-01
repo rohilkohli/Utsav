@@ -45,7 +45,9 @@ export async function verifyToken(token: string): Promise<AuthenticatedUser | nu
   try {
     return await activeVerifier(token);
   } catch (err) {
-    logger.debug(`[Auth] Token verification failed: ${err instanceof Error ? err.message : 'invalid token'}`);
+    logger.debug(
+      `[Auth] Token verification failed: ${err instanceof Error ? err.message : 'invalid token'}`,
+    );
     return null;
   }
 }
@@ -57,7 +59,7 @@ export async function verifyToken(token: string): Promise<AuthenticatedUser | nu
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
     return;
   }
@@ -76,9 +78,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 /**
  * Middleware: Attaches user if a valid Firebase ID token is provided; otherwise continues as guest.
  */
-export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function optionalAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     const user = await verifyToken(token);
     if (user) {
